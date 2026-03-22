@@ -29,7 +29,7 @@ extension-name/
     "source": "https://website.com",
     "regexp": "website\\.com/truyen/\\d+",
     "description": "Mô tả extension",
-    "locale": "vi_VN",          // vi_VN, zh_CN, en_US, ja_JP
+    "locale": "vi_VN",          // vi_VN, zh_CN, en_US,
     "language": "javascript",
     "type": "novel",            // novel, comic, chinese_novel
     "tag": "nsfw"              // Chỉ thêm nếu có nội dung 18+

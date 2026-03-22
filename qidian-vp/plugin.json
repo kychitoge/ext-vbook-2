@@ -2,7 +2,7 @@
   "metadata": {
     "name": "nhieutruyen (qidian-vp)",
     "author": "B",
-    "version": 10,
+    "version": 11,
     "source": "https://nhieutruyen.com/",
     "regexp": "qidian-vp.com/truyen/.*?",
     "description": "Đọc truyện trên trang qidian-vp, nhieutruyen.com ",

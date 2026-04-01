@@ -18,7 +18,7 @@ When asked to create or fix an extension, follow these steps:
 - **Isolate Logic**: Prototype the extraction logic (RegEx, Selectors) outside of the vBook environment first if necessary, but keep Rhino constraints in mind.
 
 ### Phase 2: Implementation (Follow vbook_ctx.md)
-- **Files**: Create `plugin.json`, `icon.png` (64x64), and source files in `src/` (`home.js`, `detail.js`, `toc.js`, `chap.js`).
+- **Files**: Create `plugin.json`, **`icon.png` (mandatory, download from the website)**, and source files in `src/` (`home.js`, `detail.js`, `toc.js`, `chap.js`).
 - **Constraint Check**: Ensure NO `async/await`, NO `...spread`, and proper `Response.success` usage.
 - **Normalization**: Always normalize URLs and handle encoding (e.g., `gbk` for Chinese sites).
 
@@ -44,6 +44,7 @@ When asked to create or fix an extension, follow these steps:
   let nextPage = String(parseInt(page || '1') + 1);
   ```
 - **`gen.js` returned no data**: Check if the home page uses different selectors for list blocks vs. dedicated list pages. Prefer dedicated list URLs (e.g., `/danh-sach/truyen-hot/`) for better reliability.
+- **`ClassCastException: UniqueTag cannot be cast to Function`**: This happens if you name the main function `home()`, `gen()`, `detail()`, etc. **ALL Javascript files (`home.js`, `gen.js`, `search.js`, `detail.js`, `toc.js`, `chap.js`) MUST export exactly ONE function named `function execute(...)`.** Do NOT name the function after the file. The entry point is ALWAYS `execute()`.
 
 - **Character Obfuscation**: Some sites replace characters (e.g., `đ**m` for `đám`). Use a `cleanContent` helper in `chap.js` with Regex replacements.
 - **Shared Utilities**: Use a `src/utils.js` for common parsing logic (e.g., `parseNovelList`). Both `gen.js` and `search.js` should `load('utils.js')` to maintain consistency.
@@ -52,6 +53,7 @@ When asked to create or fix an extension, follow these steps:
 
 ## 💡 Pro Tips for AI
 - **Use `vbook test-all` First**: This is the fastest way to verify the entire extension logic in one go.
+- **Enrich the Detail UI (`detail.js`)**: ALWAYS populate the optional `genres` (for clickable tags) and `suggests` (for "Cùng tác giả" or related books) arrays in the `detail(url)` response if the website provides categories or author names. Map their `script` to `"gen.js"` (if pushing a URL) or `"search.js"` (if pushing a keyword) to massively improve user experience.
 - **Robust Selectors**: Sites often change structure. Use multiple selectors in `doc.select()` (e.g. `.row, .item, .col-truyen-main .row`) to increase resilience.
 - **Browser Tool**: Use the browser tool to double-check selectors if `read_url_content` is unclear.
 
@@ -98,7 +100,7 @@ optional: src/home.js, src/genre.js, src/gen.js, src/search.js, src/page.js
 {
   "metadata": {
     "name":"", "author":"", "version":1, "source":"https://",
-    "regexp":"escaped\\.domain\\.com",
+    "regexp":"escaped\\.domain\\.com/truyen/.*", 
     "description":"", "locale":"vi_VN|zh_CN|en_US",
     "language":"javascript",
     "type":"novel|comic|chinese_novel|translate|tts",
@@ -110,6 +112,10 @@ optional: src/home.js, src/genre.js, src/gen.js, src/search.js, src/page.js
   }
 }
 ```
+**CRITICAL `plugin.json` RULES:**
+1. **`regexp`**: MUST be a regex that matches the *detail page URL* ONLY (not the root domain, nor the chapter URLs). Example: `domain\\.com/truyen/[^/]+/?$`. It MUST use strict end anchors like `[^/]+/?$` to prevent accidentally matching subpaths like `domain.com/truyen/abc/chapter-1`.
+2. **`script`**: The file paths MUST ONLY be the filenames (e.g., `"home": "home.js"`), do NOT include the `src/` directory prefix!
+3. **`author`**: MUST read the `.env` file in the `vbook-tool` directory to find the `author=` value, and use it here.
 Omit any script key not used. `tag` only if 18+.
 
 ---

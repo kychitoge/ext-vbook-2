@@ -5,7 +5,7 @@
         "version": 3,
         "source": "https://truyendich.vn",
         "regexp": "https://((truyendich.vn)|(tienhiep.xyz))/.*?",
-        "description": "Đọc truyện trên trang tienhiep.net",
+        "description": "Đọc truyện trên trang truyendich",
         "locale": "vi_VN",
         "type": "novel",
         "language": "javascript"

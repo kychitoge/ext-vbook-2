@@ -6,14 +6,13 @@ function execute(url, page) {
         let doc = response.html();
         var el = doc.select(".list .row");
         var novelList = [];
-        var next = parseInt(page) + 1;
-        for (var i = 0; i < el.size(); i++) {
-            var e = el.get(i);
-            let link = e.select(".truyen-title a").attr("href")
-            let coverImg = link.replace("https://truyendich.vn", "https://truyendich.vn/story-thumb");
-            if (coverImg.endsWith('/')) {
-                coverImg = coverImg.slice(0, -1);
-                coverImg = coverImg + ".jpg"
+        let next = String(parseInt(page) + 1);
+        for (let i = 0; i < el.size(); i++) {
+            let e = el.get(i);
+            let link = e.select(".truyen-title a").attr("href");
+            let coverImg = e.select(".truyen-title img").first().attr("src");
+            if (!coverImg) {
+                coverImg = e.select("img").first().attr("src");
             }
             novelList.push({
                 name: e.select(".truyen-title").text(),
@@ -22,7 +21,6 @@ function execute(url, page) {
                 cover: coverImg,
                 host: "https://truyendich.vn/",
             });
-
         }
         return Response.success(novelList, next);
     }

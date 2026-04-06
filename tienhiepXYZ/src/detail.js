@@ -3,11 +3,7 @@ function execute(url) {
     let response = fetch(url);
     if (response.ok) {
         let doc = response.html();
-        let coverImg = url.replace("https://truyendich.vn", "https://truyendich.vn/story-thumb");
-        if (coverImg.endsWith('/')) {
-            coverImg = coverImg.slice(0, -1);
-            coverImg = coverImg + ".jpg"
-        }
+
         var genres = [];
         doc.select('a[itemprop="genre"]').forEach(e => {
             genres.push({
@@ -16,14 +12,18 @@ function execute(url) {
                 script: "gen.js"
             });
         });
-        console.log(coverImg)
+        let coverImg = doc.select(".book img").first().attr("src");
+        let author = doc.select('.info a[href*="/tac-gia/"]').first().text();
+        let ongoing = doc.select(".info").text().indexOf("Đang ra") >= 0;
+
         return Response.success({
             name: doc.select('h3.title').first().text(),
             cover: coverImg,
-            author: doc.select('a[itemprop="author"]').first().text(),
+            author: author,
             description: doc.select(".desc-text").text(),
             host: "https://truyendich.vn/",
             genres: genres,
+            ongoing: ongoing
         });
     }
 

@@ -75,7 +75,51 @@ async function sendRequest(ip, port, headers, verbose = false) {
     });
 }
 
+/**
+ * Send HTTP POST request to the VBook app (Modern API)
+ */
+async function sendModernRequest(ip, port, endpoint, payload, verbose = false) {
+    return new Promise((resolve, reject) => {
+        const http = require('http');
+        const data = JSON.stringify(payload);
+        const options = {
+            hostname: ip,
+            port: port,
+            path: `/${endpoint}`,
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(data)
+            },
+            timeout: 15000
+        };
+
+        const req = http.request(options, (res) => {
+            let responseData = '';
+            res.on('data', (chunk) => { responseData += chunk; });
+            res.on('end', () => {
+                try {
+                    resolve(JSON.parse(responseData));
+                } catch (e) {
+                    resolve({ raw: responseData, code: res.statusCode });
+                }
+            });
+        });
+
+        req.on('error', (e) => reject(e));
+        req.on('timeout', () => {
+            req.destroy();
+            reject(new Error("Connection timeout"));
+        });
+
+        if (verbose) console.log(`[HTTP POST] http://${ip}:${port}/${endpoint}`);
+        req.write(data);
+        req.end();
+    });
+}
+
 module.exports = {
     getLocalIP,
-    sendRequest
+    sendRequest,
+    sendModernRequest
 };

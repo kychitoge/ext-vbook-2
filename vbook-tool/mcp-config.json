@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "vbook": {
+      "command": "node",
+      "args": ["d:/Github/ext-vbook-bi/vbook-tool/vbook-mcp-server.js"],
+      "env": {}
+    }
+  }
+}

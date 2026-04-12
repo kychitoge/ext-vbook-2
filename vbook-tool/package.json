@@ -1,7 +1,7 @@
 {
   "name": "vbook-tool",
-  "version": "1.1.0",
-  "description": "CLI tool for VBook extension development (Simplified)",
+  "version": "2.0.0",
+  "description": "Professional CLI toolkit for VBook extension development",
   "main": "index.js",
   "bin": {
     "vbook": "./index.js"
@@ -11,8 +11,9 @@
   },
   "dependencies": {
     "archiver": "^7.0.1",
-    "dotenv": "^16.4.5",
     "commander": "^12.1.0",
+    "dotenv": "^16.4.5",
+    "glob": "^10.3.10",
     "string-argv": "^0.3.2"
   }
 }

@@ -1,58 +1,159 @@
-# 🚀 VBook CLI Tool
+# 🚀 VBook CLI Tool v2.0
 
-Standalone Node.js tool to debug, install, and package VBook extensions.
+Professional CLI toolkit for creating, testing, and publishing VBook extensions.
 
-## 🛠 1. Installation & Setup
+## 🛠 Installation
 
-Before running anything, open a terminal in the `vbook-tool` directory and run:
 ```bash
+cd vbook-tool
 npm install
+npm link     # Makes `vbook` command available globally
 ```
 
 ---
 
-## 🏃 2. How to Run (Two Methods)
+## 📋 Command Reference
 
-Choose the method that works best for you:
+| Command | Description | Example |
+|---------|------------|---------|
+| `vbook create` | Scaffold a new extension | `vbook create metruyencv -s https://metruyencv.com -t novel` |
+| `vbook validate` | Check Rhino compatibility | `vbook validate` |
+| `vbook list` | List all extensions | `vbook list --type novel` |
+| `vbook debug` | Debug script on device | `vbook debug src/home.js` |
+| `vbook test-all` | Full flow test | `vbook test-all` |
+| `vbook install` | Install to device | `vbook install` |
+| `vbook build` | Package into plugin.zip | `vbook build --bump` |
+| `vbook publish` | Build + update registry | `vbook publish` |
 
-### Method A: Professional Shorthand (Recommended)
-This method allows you to use the `vbook` command from any directory.
-1. In `vbook-tool/`, run: `npm link`
-2. Now, from your **plugin root**, just use:
-   - `vbook test-all` (End-to-end flow test)
-   - `vbook debug src/home.js` (Debug a specific file)
-   - `vbook install` (Install to device)
-   - `vbook build` (Package into zip)
+---
 
-### Method B: Direct Node.js (Simple)
-If you don't want to link, you can call the tool directly using the file path:
+## 🏗️ `vbook create` — Scaffold Extension
+
+Creates a new extension directory with template files that have TODO markers.
+
 ```bash
-node path/to/vbook-tool/index.js test-all
-node path/to/vbook-tool/index.js debug src/home.js
-node path/to/vbook-tool/index.js install
-node path/to/vbook-tool/index.js build
+vbook create <name> --source <url> [options]
+
+# Required:
+#   -s, --source <url>    Website URL
+
+# Optional:
+#   -t, --type <type>     novel|comic|chinese_novel (default: novel)
+#   -l, --locale <locale> vi_VN|zh_CN|en_US (default: vi_VN)
+#   --tag <tag>           Tag (e.g. nsfw)
+#   --minimal             Only create required files (detail, toc, chap)
+```
+
+Example:
+```bash
+vbook create metruyencv --source https://metruyencv.com --type novel --locale vi_VN
 ```
 
 ---
 
-## ⚙️ 3. Configuration
+## 🔍 `vbook validate` — Rhino Compatibility Checker
 
-Edit the `.env` file in the `vbook-tool` directory to set your IP:
-- `VBOOK_IP`: Your mobile device's IP (e.g., `192.168.1.10`).
-- `VBOOK_PORT`: Port 8080.
-- `LOCAL_PORT`: Port for the local server (default 8080).
+Validates extension structure and checks for Rhino-incompatible syntax:
+- No `async/await`
+- No optional chaining (`?.`)
+- No nullish coalescing (`??`)
+- No spread in calls (`...args`)
+- No default parameters
+- Checks `function execute()` in every script
+
+```bash
+vbook validate              # Current directory
+vbook validate ./khotruyenchu  # Specific extension
+```
 
 ---
 
-## 🔍 4. How to Analyze Results
+## 📦 `vbook list` — List Extensions
 
-- **`[LOG FROM DEVICE]`**: Displays `Console.log()` and `Log.log()` output from your Rhino script on the phone.
-- **`[RESULT]`**: The final value returned by your `execute()` function (JSON is auto-beautified).
-- **`[EXCEPTION FROM DEVICE]`**: Shows runtime/syntax errors occurring on the phone.
+```bash
+vbook list                  # All extensions
+vbook list --type novel     # Filter by type
+vbook list --locale zh_CN   # Filter by locale
+vbook list --json           # JSON output for scripting
+```
 
 ---
 
-## 💡 Pro Tips
+## 🐛 `vbook debug` — Debug Script
 
-- **Auto-Cleanup**: The tool automatically closes the server after each command to prevent `EADDRINUSE` errors.
-- **Verbose**: Add `--verbose` or set `VERBOSE=true` in `.env` for more detailed network logs.
+Send a single script to the VBook device.
+
+```bash
+vbook debug <file> [options]
+
+#   -i, --ip <ip>        Device IP (or VBOOK_IP in .env)
+#   -in, --input <input> Test input
+#   -v, --verbose        Show network details
+```
+
+Example:
+```bash
+vbook debug src/detail.js -in "https://truyenfull.com/tao-tac/"
+```
+
+---
+
+## 🧪 `vbook test-all` — Full Flow Test
+
+Runs: home → gen → detail → toc → chap
+
+```bash
+vbook test-all              # Full test
+vbook test-all --skip home,gen  # Skip specific steps
+```
+
+---
+
+## 📥 `vbook install` — Install on Device
+
+```bash
+vbook install               # Install current extension
+```
+
+---
+
+## 📦 `vbook build` — Package Extension
+
+```bash
+vbook build                 # Build with validation
+vbook build --bump          # Auto-increment version
+vbook build --skip-validate # Skip validation
+```
+
+---
+
+## 🚀 `vbook publish` — Build + Update Plugin List
+
+Replaces the old `update_plugin_list.js` workflow.
+
+```bash
+vbook publish               # Build current + update plugin.json
+vbook publish --all         # Rebuild ALL extensions
+vbook publish --list-only   # Only regenerate root plugin.json
+```
+
+---
+
+## ⚙️ Configuration (.env)
+
+```env
+author=B                    # Default author for new extensions
+VBOOK_IP=192.168.1.10      # Device IP
+VBOOK_PORT=8080             # Device port
+LOCAL_PORT=8080             # Local file server port
+VERBOSE=true                # Verbose output
+GITHUB_REPO=dat-bi/ext-vbook  # GitHub repo for plugin URLs
+```
+
+---
+
+## 🔍 Output Guide
+
+- `[LOG FROM DEVICE]` — `Console.log()` output from Rhino
+- `[RESULT]` — Return value of `execute()` (auto-prettified)
+- `[EXCEPTION FROM DEVICE]` — Runtime errors on device

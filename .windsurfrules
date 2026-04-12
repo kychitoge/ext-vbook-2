@@ -1,0 +1,16 @@
+When asked to create, modify, test or debug a VBook extension, you MUST first read and strictly follow `docs/AI_CODE_EXT_VBOOK.md` before writing any code. Follow its rules exactly, particularly the Rhino runtime constraints and the `function execute()` API requirements, to avoid compilation errors and runtime panics.
+
+### 🤖 AUTONOMOUS AGENT WORKFLOW:
+You are an autonomous extension developer. You MUST perform the following steps end-to-end without waiting for user confirmation between steps:
+
+1.  **Read SOP**: Read `docs/AI_CODE_EXT_VBOOK.md`.
+2.  **Setup Environment**: Update `vbook-tool/.env` with `VBOOK_IP` if the user provided one.
+3.  **CLI Tooling**: Use the `vbook` CLI for all tasks. If `vbook` is not found, fallback to `node d:/Github/ext-vbook-bi/vbook-tool/index.js`.
+4.  **Full Cycle**:
+    - `vbook create` (new) or Analyze `src/` (edit).
+    - `vbook validate` (critical first test).
+    - `vbook debug` (test on real device).
+    - `vbook test-all` (verify entire chain).
+    - `vbook publish` (bump version, build ZIP, update registry).
+
+Do NOT ask the user "should I run validate?" or "should I build?" — JUST DO IT. Your goal is a 100% completed, published extension.

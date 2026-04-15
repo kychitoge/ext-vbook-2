@@ -246,6 +246,17 @@
             "tag": "nsfw"
         },
         {
+            "name": "nhatruyen",
+            "author": "B",
+            "path": "https://raw.githubusercontent.com/dat-bi/ext-vbook/main/extensions/nhatruyen/plugin.zip",
+            "version": 5,
+            "source": "https://nhatruyen.site",
+            "icon": "https://raw.githubusercontent.com/dat-bi/ext-vbook/main/extensions/nhatruyen/icon.png",
+            "description": "Đọc truyện trên trang nhatruyen",
+            "type": "novel",
+            "locale": "vi_VN"
+        },
+        {
             "name": "ntruyen",
             "author": "B",
             "path": "https://raw.githubusercontent.com/dat-bi/ext-vbook/main/extensions/ntruyen/plugin.zip",
@@ -478,6 +489,28 @@
             "description": "Xem đánh giá truyện trên trang https://www.tuishujun.com/",
             "type": "chinese_novel",
             "locale": "zh_CN"
+        },
+        {
+            "name": "DEMO_COMIC",
+            "author": "TODO_AUTHOR",
+            "path": "https://raw.githubusercontent.com/dat-bi/ext-vbook/main/extensions/_demo_comic/plugin.zip",
+            "version": 1,
+            "source": "https://TODO_DOMAIN.net",
+            "icon": "https://raw.githubusercontent.com/dat-bi/ext-vbook/main/extensions/_demo_comic/icon.png",
+            "description": "Demo comic extension template",
+            "type": "comic",
+            "locale": "vi_VN"
+        },
+        {
+            "name": "DEMO_NOVEL",
+            "author": "TODO_AUTHOR",
+            "path": "https://raw.githubusercontent.com/dat-bi/ext-vbook/main/extensions/_demo_novel/plugin.zip",
+            "version": 1,
+            "source": "https://TODO_DOMAIN.net",
+            "icon": "https://raw.githubusercontent.com/dat-bi/ext-vbook/main/extensions/_demo_novel/icon.png",
+            "description": "Demo novel extension template",
+            "type": "novel",
+            "locale": "vi_VN"
         },
         {
             "name": "Độc giả số 1",

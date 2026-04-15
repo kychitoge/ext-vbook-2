@@ -211,6 +211,69 @@ const TOOLS = [
             },
             required: ['extension_name', 'metadata_patch']
         }
+    },
+{
+        name: 'inspect',
+        description: 'Run a one-shot DOM inspection on a URL using the VBook device. Returns h1, h2 list, image URLs, link patterns, and optionally tests specific CSS selectors. Replaces the ad-hoc test.js pattern — no files created.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                url: { type: 'string', description: 'URL to inspect on the device' },
+                extension_dir: { type: 'string', description: 'Path to any valid extension directory (used as script context)' },
+                selectors: {
+                    type: 'array',
+                    items: { type: 'string' },
+                    description: 'Optional CSS selectors to test explicitly, e.g. ["h1", ".entry-content", "a[href*=\\/chuong\/]"]'
+                },
+                use_gbk: { type: 'boolean', description: 'Use GBK encoding (for Chinese sites). Default false.' }
+            },
+            required: ['url', 'extension_dir']
+        }
+    },
+    {
+        name: 'read_context',
+        description: 'Read a context document from the context/ folder. Use this to read runtime rules, workflow, lessons, or repair guides.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                file: { type: 'string', enum: ['01_runtime.md', '02_workflow.md', '03_lessons.md', '04_demo.md', '05_repair.md'], description: 'Context file to read' }
+            },
+            required: ['file']
+        }
+    },
+    {
+        name: 'append_lesson',
+        description: 'Append a new lesson to 03_lessons.md after completing a fix. AI should call this to record new patterns learned.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                lesson: { type: 'string', description: 'Markdown content to append as new lesson (## Title\\n\\n**Problem:**...\\n\\n**Solution:**... pattern)' }
+            },
+            required: ['lesson']
+        }
+    },
+    {
+        name: 'list_extension_files',
+        description: 'List all files in an extension directory. Use to see available scripts before reading/writing.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                extension_name: { type: 'string', description: 'Extension directory name (e.g. ntruyen)' }
+            },
+            required: ['extension_name']
+        }
+    },
+    {
+        name: 'copy_demo',
+        description: 'Copy a demo extension template to create a new extension. Options: _demo_novel (novel type) or _demo_comic (comic type).',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                name: { type: 'string', description: 'New extension directory name (e.g. truyenfull)' },
+                type: { type: 'string', enum: ['novel', 'comic'], description: 'Template type: novel or comic' }
+            },
+            required: ['name', 'type']
+        }
     }
 ];
 
@@ -431,6 +494,173 @@ async function executeTool(name, args) {
             current.metadata = { ...current.metadata, ...args.metadata_patch };
             fs.writeFileSync(pluginPath, JSON.stringify(current, null, 2), 'utf8');
             return { success: true, metadata: current.metadata };
+        }
+
+        case 'inspect': {
+            // Resolve extension context directory
+            const inspectCwd = args.extension_dir
+                ? resolveExtPath(args.extension_dir)
+                : (() => {
+                    const extDirs = fs.readdirSync(path.join(PROJECT_ROOT, 'extensions'))
+                        .filter(d => fs.existsSync(path.join(PROJECT_ROOT, 'extensions', d, 'plugin.json')));
+                    return path.join(PROJECT_ROOT, 'extensions', extDirs[0] || '');
+                })();
+
+            const encoding = args.use_gbk ? '"gbk"' : '';
+            const htmlCall = args.use_gbk ? 'res.html("gbk")' : 'res.html()';
+
+            // Build selector tests
+            const selectors = args.selectors || [];
+            const selectorCode = selectors.map((sel, i) => {
+                const safeKey = 's' + i;
+                return [
+                    `var el_${safeKey} = doc.select(${JSON.stringify(sel)});`,
+                    `result.selectors[${JSON.stringify(sel)}] = {`,
+                    `  found: el_${safeKey}.size() > 0,`,
+                    `  count: el_${safeKey}.size() + "",`,
+                    `  text_preview: el_${safeKey}.size() > 0 ? (el_${safeKey}.first().text().substring(0, 80) + "") : "",`,
+                    `  attr_src: el_${safeKey}.size() > 0 ? (el_${safeKey}.first().attr("src") + "") : "",`,
+                    `  attr_href: el_${safeKey}.size() > 0 ? (el_${safeKey}.first().attr("href") + "") : ""`,
+                    `};`
+                ].join('\n');
+            }).join('\n');
+
+            const inspectScript = `
+function execute(url) {
+    var res = fetch(url);
+    if (!res.ok) return Response.error("fetch failed: " + res.status);
+    var doc = res.${htmlCall.replace('res.', '')};
+
+    var h1El = doc.select("h1").first();
+    var h1 = (h1El ? h1El.text() : "") + "";
+
+    var h2List = [];
+    doc.select("h2").forEach(function(el) { h2List.push(el.text() + ""); });
+
+    var imgs = [];
+    var imgCount = 0;
+    doc.select("img").forEach(function(el) {
+        if (imgCount >= 5) return;
+        imgs.push((el.attr("data-src") || el.attr("src") || "") + "");
+        imgCount++;
+    });
+
+    var links = [];
+    var linkCount = 0;
+    doc.select("a[href]").forEach(function(el) {
+        if (linkCount >= 10) return;
+        var href = (el.attr("href") || "") + "";
+        if (href.indexOf("http") === 0 || href.indexOf("/") === 0) {
+            links.push(href);
+            linkCount++;
+        }
+    });
+
+    var result = {
+        h1: h1,
+        h2_list: h2List.slice(0, 5),
+        images: imgs,
+        links_sample: links,
+        selectors: {}
+    };
+
+${selectorCode}
+
+    return Response.success(result);
+}`;
+
+            // Write temp script, debug it, then delete
+            const tmpFile = path.join(inspectCwd, 'src', '_inspect_tmp.js');
+            fs.writeFileSync(tmpFile, inspectScript, 'utf8');
+
+            let inspectResult;
+            try {
+                const out = await runCLI(['debug', tmpFile, '-in', args.url, '--json'], inspectCwd);
+                const parsed = parseJsonOutput(out.stdout);
+                inspectResult = parsed || { success: false, error: out.stderr || out.stdout };
+            } finally {
+                try { fs.unlinkSync(tmpFile); } catch (_) {}
+            }
+
+            return inspectResult;
+        }
+
+        case 'read_context': {
+            const ctxFile = path.join(PROJECT_ROOT, 'context', args.file);
+            if (!fs.existsSync(ctxFile)) {
+                return { error: `Context file not found: ${args.file}` };
+            }
+            const content = fs.readFileSync(ctxFile, 'utf8');
+            return { file: args.file, content };
+        }
+
+        case 'append_lesson': {
+            const lessonFile = path.join(PROJECT_ROOT, 'context', '03_lessons.md');
+            const existing = fs.readFileSync(lessonFile, 'utf8');
+            const newContent = existing + '\n\n---\n\n' + args.lesson;
+            fs.writeFileSync(lessonFile, newContent, 'utf8');
+            return { success: true, file: '03_lessons.md' };
+        }
+
+        case 'list_extension_files': {
+            const extDir = resolveExtDir(args.extension_name);
+            if (!fs.existsSync(extDir)) {
+                return { error: `Extension not found: ${args.extension_name}` };
+            }
+            const files = [];
+            const entries = fs.readdirSync(extDir);
+            for (const entry of entries) {
+                const fullPath = path.join(extDir, entry);
+                const stat = fs.statSync(fullPath);
+                if (stat.isDirectory()) {
+                    const subEntries = fs.readdirSync(fullPath);
+                    for (const sub of subEntries) {
+                        files.push(entry + '/' + sub);
+                    }
+                } else {
+                    files.push(entry);
+                }
+            }
+            return { extension: args.extension_name, files };
+        }
+
+        case 'copy_demo': {
+            const demoType = args.type === 'comic' ? '_demo_comic' : '_demo_novel';
+            const demoDir = path.join(PROJECT_ROOT, 'extensions', demoType);
+            const newDir = path.join(PROJECT_ROOT, 'extensions', args.name);
+            
+            if (!fs.existsSync(demoDir)) {
+                return { error: `Demo template not found: ${demoType}` };
+            }
+            if (fs.existsSync(newDir)) {
+                return { error: `Extension already exists: ${args.name}` };
+            }
+            
+            // Copy demo folder recursively
+            function copyDir(src, dest) {
+                fs.mkdirSync(dest, { recursive: true });
+                const entries = fs.readdirSync(src);
+                for (const entry of entries) {
+                    const srcPath = path.join(src, entry);
+                    const destPath = path.join(dest, entry);
+                    const stat = fs.statSync(srcPath);
+                    if (stat.isDirectory()) {
+                        copyDir(srcPath, destPath);
+                    } else {
+                        fs.copyFileSync(srcPath, destPath);
+                    }
+                }
+            }
+            
+            copyDir(demoDir, newDir);
+            
+            // Update plugin.json with new name
+            const pluginPath = path.join(newDir, 'plugin.json');
+            let plugin = JSON.parse(fs.readFileSync(pluginPath, 'utf8'));
+            plugin.metadata.name = args.name;
+            fs.writeFileSync(pluginPath, JSON.stringify(plugin, null, 2), 'utf8');
+            
+            return { success: true, extension: args.name, type: args.type };
         }
 
         default:

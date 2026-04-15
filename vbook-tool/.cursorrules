@@ -1,24 +1,43 @@
-When asked to create, modify, test or debug a VBook extension, you MUST first read and strictly follow these docs before writing any code:
-1. `docs/AI_CODE_EXT_VBOOK.md` — Runtime constraints (Rhino 1.7.14) and API reference
-2. `docs/skills/01_create_extension.md` — Skill for creating a new extension
-3. `docs/skills/02_repair_extension.md` — Skill for fixing a broken extension
+When asked to create, modify, test or debug a VBook extension, you MUST first read context documents in this order:
+
+1.  `context/01_runtime.md` — Rhino ES6 constraints and API reference
+2.  `context/02_workflow.md` — Development SOP
+3.  `context/03_lessons.md` — Common mistakes and fixes
+4.  `context/04_demo.md` — Code examples
+5.  `context/05_repair.md` — Extension repair guide
 
 ### 🤖 AUTONOMOUS AGENT WORKFLOW:
-You are an autonomous extension developer. Execute the full workflow end-to-end WITHOUT waiting for user confirmation between steps.
+Execute the full workflow end-to-end WITHOUT waiting for confirmation.
 
-**Step Order (NEVER skip or reorder):**
+**Steps:**
+1. `vbook check-env --json` — Verify device first.
 
-1. **`vbook check-env --json`** — Verify device connectivity FIRST. STOP if device unreachable.
-2. **Read the matching Skill file** based on task type (create vs repair).
-3. **`vbook analyze <url> --json`** — Analyze website structure before writing any code.
-4. Write/update code using selectors from analyze output.
-5. **`vbook validate ./<name>`** — Fix ALL errors before proceeding.
-6. **`vbook debug src/<script>.js -in "<url>" --json`** — Test on device, fix if exception != null.
-7. **`vbook test-all --json`** — Full chain test. Use `--from <step>` to resume from a failed step.
-8. **`vbook publish`** — Bump version, build ZIP, update registry.
+**NEW EXTENSION**: If user asks to create, YOU MUST ASK QUESTIONS first:
 
-**CLI Fallback:** If `vbook` not found → `node d:/Github/ext-vbook-bi/vbook-tool/index.js`
+```
+Để tạo extension, mình cần:
 
-**Output Format:** Always use `--json` flag when running CLI for machine-readable output.
+1. Loại? [A] Novel [B] Comic [C] Chinese [D] Translate [E] TTS
+2. Tag? [A] Thường [B] 18+
+3. Link trang DANH SÁCH:
+4. Link trang CHI TIẾT:
+5. Link trang MỤC LỤC:
+6. Link trang ĐỌC CHƯƠNG:
+7. Phân trang mục? [A] Có [B] Không
+8. Có search? [A] Có [B] Không
+9. Có genres? [A] Có [B] Không
+```
 
-Do NOT ask "should I validate?" or "should I publish?" — JUST DO IT. Goal: 100% completed, published extension.
+CHỈ tiếp tục SAU KHI user trả lời đủ.
+
+2. Read context files in order.
+3. `vbook analyze <url> --json`
+4. Write code.
+5. `vbook validate ./<name>`
+6. `vbook debug src/<script>.js -in "<url>" --json`
+7. `vbook test-all --json`
+8. `vbook publish`
+
+**CLI Fallback:** `node d:/Github/ext-vbook-bi/vbook-tool/index.js`
+
+**Record Lesson:** After fixing bugs, call `append_lesson` MCP tool.

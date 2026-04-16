@@ -2,121 +2,187 @@
 
 > Standard workflow for creating and maintaining VBook extensions.
 
+---
+
+## 🚨 PRIME DIRECTIVE — READ THIS BEFORE ANYTHING ELSE
+
+```
+╔══════════════════════════════════════════════════════════════════╗
+║  NO REAL DATA   →  DO NOT WRITE CODE                            ║
+║  CHECK-ENV FAIL →  DO NOT DEBUG OR FIX ANYTHING                 ║
+║  NO DEVICE TEST →  DO NOT PUBLISH                               ║
+╚══════════════════════════════════════════════════════════════════╝
+```
+
+### ❌ FORBIDDEN ACTIONS — Absolute prohibition, no exceptions:
+
+- Guessing selectors by reading HTML source visually instead of using `mcp_vbook_inspect`
+- Editing regex/selectors without a real device response
+- Continuing after `check-env` returns timeout or any error
+- "Trying anyway" after any step fails
+- Explaining errors from experience when no real log exists
+- Apologizing and then doing the forbidden thing anyway
+
+### ✅ Mandatory self-check BEFORE every action:
+
+```
+[ ] Has check-env PASSED?              → No → STOP, notify user
+[ ] Do I have real data from device?   → No → STOP, run debug first
+[ ] Has the previous step completed?   → No → STOP, do not skip
+```
+
+> **Why these rules exist:** Vietnamese novel sites commonly use Cloudflare, client-side JS rendering,
+> or session-dependent HTML. Fixing code without a real device test may appear correct in a desktop
+> browser but fail completely inside VBook's Rhino runtime. Every shortcut creates silent bugs that
+> are harder to debug than stopping and asking.
+
+---
+
 ## Development Workflow
 
-### Creating NEW Extension (8 Steps)
+### Creating a NEW Extension (8 Steps)
 
-0. **QUESTIONNAIRE** — AI PHẢI HỎI user trước khi làm gì khác:
+#### STEP 0 — QUESTIONNAIRE 🔴 MANDATORY BEFORE EVERYTHING
+
+**AI MUST ask all 8 questions. Do NOT proceed to Step 1 until all answers are received.**
 
 ```
-Để tạo extension, mình cần bạn trả lời:
+To create the extension, please answer:
 
-1. Loại? [A] Novel  [B] Comic  [C] Chinese novel  [D] Translate  [E] TTS
-2. Tag? [A] Thường  [B] 18+
-3. Link trang DANH SÁCH truyện (home/gen):
-4. Link trang CHI TIẾT một truyện bất kỳ:
-5. Link trang MỤC LỤC chương:
-6. Link trang ĐỌC CHƯƠNG:
-7. Có search? [A] Có  [B] Không
-8. Có genres/thể loại? [A] Có  [B] Không
+1. Type?    [A] Novel  [B] Comic  [C] Chinese novel  [D] Translate  [E] TTS
+2. Tag?     [A] Normal  [B] 18+
+3. LISTING page URL (home/genre list):
+4. DETAIL page URL (any single book):
+5. TABLE OF CONTENTS page URL:
+6. CHAPTER READING page URL:
+7. Has search?  [A] Yes  [B] No
+8. Has genres?  [A] Yes  [B] No
 ```
 
-**CHỈ SAU KHI có đủ answers mới tiếp tục bước 1.**
-
-> ℹ️ Không cần hỏi về phân trang mục lục. `page.js` luôn được tạo mặc định.
-> Nếu mục lục không phân trang → page.js chỉ trả về `[url]`.
+> ℹ️ No need to ask about ToC pagination. `page.js` is always created by default.
+> If the ToC has no pagination → page.js simply returns `[url]`.
 
 ---
 
-1. **Inspect Website** — TRƯỚC KHI scaffold, inspect TẤT CẢ các URL user cung cấp:
-   ```
-   mcp_vbook_inspect(url_danh_sach)  → selectors: list item, title, link, cover
-   mcp_vbook_inspect(url_chi_tiet)   → selectors: name, author, cover, status, description, genres
-   mcp_vbook_inspect(url_muc_luc)    → selectors: chapter links, pagination (có hay không?)
-   mcp_vbook_inspect(url_doc_chuong) → selectors: chapter content
-   ```
-   **Ghi nhận kết quả. KHÔNG viết code trước bước này.**
+#### STEP 1 — Inspect Website 🔴 DO NOT WRITE CODE BEFORE THIS STEP
 
-2. **Scaffold**
-   ```bash
-   vbook create "<name>" --source "<url>" --type <novel|comic|chinese_novel>
-   ```
-   **⚠️ POST-SCAFFOLD CHECK**: Verify `icon.png` is valid image (not HTML/text).
+Inspect **ALL** URLs provided by the user before scaffolding:
 
-3. **Implement với selectors THỰC TẾ**
-   - Dùng kết quả từ Bước 1 để điền vào `src/*.js`
-   - **NGHIÊM CẤM** dùng generic placeholders: `.book-item`, `.story-item`, `h3 a`, `.title a`, `#content`
-   - **CRITICAL**: No async/await, no `?.`, no `??`, no spread
-   - **page.js RULE**: LUÔN tạo `page.js`. Nếu site không phân trang mục lục → `return Response.success([url])`. Nếu có phân trang → trả về mảng URL từng trang. `toc.js` nhận lần lượt từng URL từ mảng này.
+```
+mcp_vbook_inspect(url_listing)  → selectors: list item, title, link, cover
+mcp_vbook_inspect(url_detail)   → selectors: name, author, cover, status, description, genres
+mcp_vbook_inspect(url_toc)      → selectors: chapter links, pagination (yes or no?)
+mcp_vbook_inspect(url_chapter)  → selectors: chapter content
+```
 
-4. **Static Check**
-   ```bash
-   vbook validate ./<name>
-   ```
+**Record all results. Do NOT write a single line of code before this step completes.**
 
-5. **Individual Testing**
-   ```bash
-   vbook debug src/detail.js -in "<url_to_book>"
-   vbook debug src/chap.js -in "<url_to_chapter>"
-   ```
-
-6. **Full Flow Verification**
-   ```bash
-   vbook test-all
-   ```
-   **⚠️ WARNING**: After test-all passes, you MUST also:
-   - Test search.js: `vbook debug src/search.js -in "keyword"`
-   - Test genre.js: `vbook debug src/genre.js`
-   - Verify icon.png visually
-   - Test with REAL URL from website
-
-7. **Package & Publish**
-   ```bash
-   vbook publish
-   ```
+> ⚠️ If `mcp_vbook_inspect` times out or errors → STOP immediately. Notify user to check device.
 
 ---
 
-### Repair/Edit Extension (6 Steps)
+#### STEP 2 — Scaffold
 
-1. **Locate & Analyze**
-   - Read failing extension's `src/*.js` and `plugin.json`
+```bash
+vbook create "<n>" --source "<url>" --type <novel|comic|chinese_novel>
+```
 
-2. **Verify Status**
-   - Use browser to check if site structure changed
-   - Run `vbook debug` to see exact error
+**⚠️ POST-SCAFFOLD CHECK**: Verify `icon.png` is a valid image file (not HTML/text).
 
-3. **Fix Code & Config**
-   - Update selectors/parsing in `src/`
-   - If domain changed, update `metadata.source` and `metadata.regexp`
+---
 
-4. **Validate & Local Test**
-   - `vbook validate`
-   - `vbook debug` again
+#### STEP 3 — Implement with REAL Selectors
 
-5. **Bump Version & Build**
-   ```bash
-   vbook build --bump
-   ```
+- Use results from Step 1 to populate `src/*.js`
+- **STRICTLY FORBIDDEN**: generic placeholders such as `.book-item`, `.story-item`, `h3 a`, `.title a`, `#content`
+- **CRITICAL RUNTIME RULES**: No `async/await`, no `?.`, no `??`, no spread operator (Rhino ES6 constraint)
+- **page.js RULE**: ALWAYS create `page.js`. No pagination → `return Response.success([url])`. Has pagination → return array of page URLs. `toc.js` receives each URL from this array in sequence.
 
-6. **Update Registry**
-   ```bash
-   vbook publish
-   ```
+---
+
+#### STEP 4 — Static Check
+
+```bash
+vbook validate ./<n>
+```
+
+> ⚠️ If validate reports any error → FIX NOW. Do not proceed to Step 5.
+
+---
+
+#### STEP 5 — Individual Testing
+
+```bash
+vbook debug src/detail.js -in "<url_to_book>"
+vbook debug src/chap.js -in "<url_to_chapter>"
+```
+
+> ⚠️ If debug errors → fix and re-run validate before continuing.
+
+---
+
+#### STEP 6 — Full Flow Verification
+
+```bash
+vbook test-all
+```
+
+**After test-all PASSES, also verify:**
+
+- `vbook debug src/search.js -in "keyword"` (if search exists)
+- `vbook debug src/genre.js` (if genres exist)
+- Visually confirm `icon.png` renders correctly
+- Test with a real URL from the live website
+
+---
+
+#### STEP 7 — Package & Publish
+
+```bash
+vbook publish
+```
+
+**Only run this step when ALL previous steps have passed.**
+
+---
+
+### Repair / Edit Extension (6 Steps)
+
+1. **Locate & Analyze** — Read the failing extension's `src/*.js` and `plugin.json`
+2. **Verify Status** — Check in browser whether site structure changed; run `vbook debug` to get the exact error
+3. **Fix Code & Config** — Update selectors/parsing in `src/`; if domain changed, update `metadata.source` and `metadata.regexp`
+4. **Validate & Local Test** — `vbook validate` then `vbook debug` again
+5. **Bump Version & Build** — `vbook build --bump`
+6. **Update Registry** — `vbook publish`
 
 ---
 
 ### Autonomous Maintenance (Auto-Fix)
 
-When asked to fix without explicit confirmation:
+```
+🚨 MANDATORY FIRST STEP — NEVER SKIP:
 
-1. Read `vbook-tool/.env` → get VBOOK_IP
-2. Reproduce: `vbook debug src/detail.js -in "<failing_url>"`
-3. Fix code → `vbook validate`
-4. Verify: `vbook debug` again
-5. If OK: `vbook test-all`
-6. Bump & Publish: `vbook build --bump && vbook publish`
-7. Report new version
+    vbook check-env --json
+
+    ✅ PASS  → continue workflow below
+    ❌ FAIL  → OUTPUT EXACTLY:
+               "❌ DEVICE UNREACHABLE. Please:
+                1. Open VBook app → Web Server tab
+                2. Check current IP and Port
+                3. Update vbook-tool/.env with the new IP
+                Then let me know so I can re-run the test properly."
+               → FULL STOP. Do NOT guess the error.
+                  Do NOT read source. Do NOT attempt any fix.
+```
+
+After check-env PASSES:
+
+1. Reproduce: `vbook debug src/detail.js -in "<failing_url>"`
+2. Fix code → `vbook validate`
+3. Verify: `vbook debug` again
+4. If OK: `vbook test-all`
+5. Bump & Publish: `vbook build --bump && vbook publish`
+6. Report new version to user
 
 ---
 
@@ -124,12 +190,12 @@ When asked to fix without explicit confirmation:
 
 | Issue | Solution |
 |-------|----------|
-| `ReferenceError: server is not defined` | Declare `server` with `let` outside try block |
-| `data: "NaN"` in next param | Use `String(parseInt(page || '1') + 1)` |
-| `gen.js` returned no data | Check if home uses different selectors. Prefer dedicated list URLs |
+| `ReferenceError: server is not defined` | Declare `server` with `let` outside the try block |
+| `data: "NaN"` in next param | Use `String(parseInt(page \|\| '1') + 1)` |
+| `gen.js` returned no data | Check if home uses different selectors; prefer dedicated list URLs |
 | `ClassCastException` | Main function MUST be `execute()`, not `home()`, `gen()`, etc. |
 | Character obfuscation | Use cleanContent helper with Regex |
-| Redirects in search | Detect: `if (doc.select("h1, .entry-title").size() > 0)` |
+| Redirects in search | Detect with: `if (doc.select("SELECTOR_TITLE").size() > 0)` |
 
 ---
 
@@ -147,31 +213,29 @@ url = url.replace(/^(?:https?:\/\/)?(?:[^@\n]+@)?(?:www\.)?([^:\/\n?]+)/img, BAS
 ```
 
 ### Regexp in plugin.json
-MUST match detail page URL only:
+Must match the detail page URL only:
 ```
 "https?:\\/\\/(?:www\\\\.)?domain\\\\.net\\/truyen\\/[a-zA-Z0-9-]+\\/?$"
 ```
 
-### Internal API Discovery (Priority)
-ALWAYS check `/api/` routes before using Browser:
+### Internal API Discovery (Highest Priority)
+Always check `/api/` routes before falling back to HTML selectors:
 ```js
-// Try these first:
 BASE_URL + "/api/novels/slug/<slug>"
 BASE_URL + "/api/novels/<id>"
 BASE_URL + "/api/novels/search?title=<key>"
 ```
 
 ### Home Tab Pagination
-Use `{{page}}` template:
 ```js
-{ title: "Mới cập nhật", input: BASE_URL + "/trang/{{page}}", script: "gen.js" }
+{ title: "Mới cập nhật", input: BASE_URL + "/PATH/{{page}}", script: "gen.js" }
 ```
 
 ### Genres as Objects
 ```js
 genres: novel.genres.map(genre => ({
     title: genre,
-    input: BASE_URL + "/danh-sach-truyen?genre=" + encodeURIComponent(genre),
+    input: BASE_URL + "/list?genre=" + encodeURIComponent(genre),
     script: "gen.js"
 }))
 ```
@@ -181,19 +245,19 @@ genres: novel.genres.map(genre => ({
 chapList.push({ name: "...", url: "...", pay: true/false, host: BASE_URL });
 ```
 
-### page.js — Quy tắc mặc định
+### page.js — Default Rules
 
-`page.js` là **bắt buộc**. Nhận `url` từ detail, trả về mảng các URL cho `toc.js`.
+`page.js` is **mandatory**. Receives `url` from detail, returns an array of URLs for `toc.js`.
 
 ```js
-// Không có phân trang:
+// No pagination:
 function execute(url) {
     url = url.replace(/^(?:https?:\/\/)?(?:www\.)?([^\/]+)/, BASE_URL);
     if (url.slice(-1) === "/") url = url.slice(0, -1);
-    return Response.success([url]);  // toc.js sẽ nhận chính url này
+    return Response.success([url]);
 }
 
-// Có phân trang:
+// With pagination:
 function execute(url) {
     url = url.replace(/^(?:https?:\/\/)?(?:www\.)?([^\/]+)/, BASE_URL);
     if (url.slice(-1) === "/") url = url.slice(0, -1);
@@ -201,7 +265,7 @@ function execute(url) {
     if (!response.ok) return Response.error("Cannot load");
     let doc = response.html();
     let pages = [];
-    doc.select(".pagination a").forEach(function(el) {
+    doc.select("SELECTOR_PAGINATION_LINKS").forEach(function(el) {
         let href = el.attr("href") + "";
         if (href && !href.includes("#")) {
             if (!href.startsWith("http")) href = BASE_URL + href;

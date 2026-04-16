@@ -1,60 +1,30 @@
+// chap.js — Nội dung chương truyện tranh
+// Contract: execute(url) → htmlString chứa các thẻ <img> (VBook tự parse để hiển thị từng trang)
+// QUAN TRỌNG: Trả về HTML string, KHÔNG phải mảng URL ảnh!
 function execute(url) {
-    // Comic: returns list of image URLs, not HTML text
-    url = url.replace(/^(?:https?:\/\/)?(?:www\.)?([^\/]+)/, BASE_URL);
-    
-    let response = fetch(url);
-    if (!response.ok) return Response.error("Cannot load: " + response.status);
-    
-    let doc = response.html();
-    
-    // Comic pages are usually <img> tags
-    const images = [];
-    
-    // Pattern 1: Direct img tags
-    doc.select(".page-image img, .chapter-content img, . Comic images img").forEach(function(el) {
-        let src = el.attr("src") + "";
-        let dataSrc = el.attr("data-src") + "";
-        if (src || dataSrc) {
-            images.push((dataSrc || src) + "");
-        }
+    url = url.replace(/^(?:https?:\/\/)?(?:[^@\n]+@)?(?:www\.)?([^:\/\n?]+)/img, BASE_URL);
+
+    var res = fetch(url);
+    if (!res.ok) return Response.error("Cannot load: " + res.status);
+
+    var doc = res.html();
+
+    doc.select("script, style, ins, .ads, .advertisement").remove();
+
+    // TODO: Selector container chứa toàn bộ ảnh của chương
+    // Ví dụ: ".chapter-content", ".reading-content", "#chapter-images", ".page-chapter"
+    var container = doc.select("SELECTOR_IMAGE_CONTAINER").first();
+    if (!container) return Response.error("No images found");
+
+    // Resolve lazy-load: nếu ảnh dùng data-src thay vì src → gán lại src
+    container.select("img[data-src]").forEach(function(img) {
+        var lazySrc = img.attr("data-src") + "";
+        if (lazySrc) img.attr("src", lazySrc);
     });
-    
-    // Pattern 2: Lazy loading with data-src
-    if (images.length === 0) {
-        doc.select("img[data-src]").forEach(function(el) {
-            let dataSrc = el.attr("data-src") + "";
-            if (dataSrc) images.push(dataSrc);
-        });
-    }
-    
-    // Pattern 3: Background images in style
-    if (images.length === 0) {
-        doc.select("[style*='background']").forEach(function(el) {
-            let style = el.attr("style") + "";
-            let match = style.match(/url\(['"]?)([^'")]+)\1/);
-            if (match && match[2]) {
-                images.push(match[2]);
-            }
-        });
-    }
-    
-    if (images.length === 0) {
-        return Response.error("No images found");
-    }
-    
-    // Normalize image URLs
-    for (let i = 0; i < images.length; i++) {
-        if (images[i].startsWith("//")) {
-            images[i] = "https:" + images[i];
-        }
-    }
-    
-    // Comic chap returns: [{url: "...", width: ..., height: ...}] or HTML with <img>
-    // Using HTML format for VBook compatibility
-    let html = "";
-    for (let i = 0; i < images.length; i++) {
-        html += '<img src="' + images[i] + '"><br>';
-    }
-    
-    return Response.success(html);
+    container.select("img[data-lazy-src]").forEach(function(img) {
+        var lazySrc = img.attr("data-lazy-src") + "";
+        if (lazySrc) img.attr("src", lazySrc);
+    });
+
+    return Response.success(container.html() + "");
 }

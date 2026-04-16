@@ -1,9 +1,11 @@
+// home.js (Comic)
+// Contract: execute() → [{ title, input, script }]
 function execute() {
-    // Comic: similar structure, but often display cover-first
+    // TODO: Thay PATH phù hợp với cấu trúc URL của site
     return Response.success([
-        { title: "Mới cập nhật", input: BASE_URL + "/danh-sach/trang/{{page}}", script: "gen.js" },
-        { title: "Truyện mới", input: BASE_URL + "/truyen-moi/trang/{{page}}", script: "gen.js" },
-        { title: "Top view", input: BASE_URL + "/top-view/trang/{{page}}", script: "gen.js" },
-        { title: "Thể loại", input: BASE_URL + "/the-loai", script: "genre.js" }
+        { title: "Mới cập nhật", input: BASE_URL + "/PATH_MOI/{{page}}",  script: "gen.js" },
+        { title: "Top view",     input: BASE_URL + "/PATH_TOP/{{page}}",  script: "gen.js" },
+        { title: "Hoàn thành",   input: BASE_URL + "/PATH_HOAN/{{page}}", script: "gen.js" },
+        { title: "Thể loại",     input: BASE_URL + "/PATH_THELOAI",       script: "genre.js" }
     ]);
 }

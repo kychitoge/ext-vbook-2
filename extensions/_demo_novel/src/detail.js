@@ -1,84 +1,74 @@
+// detail.js — Thông tin chi tiết một truyện
+// Contract: execute(url) → { name*, cover, host, author, description, ongoing:bool*,
+//                             genres?:[{title,input,script}], suggests?:[{title,input,script}],
+//                             comments?:[{title,input,script}] }
 function execute(url) {
-    // Novel: extract detailed book info with genres, suggests, comments
-    url = url.replace(/^(?:https?:\/\/)?(?:www\.)?([^\/]+)/, BASE_URL);
-    if (url.slice(-1) === "/") url = url.slice(0, -1);
-    
-    let response = fetch(url);
-    if (!response.ok) return Response.error("Cannot load: " + response.status);
-    
-    let doc = response.html();
-    
-    let name = doc.select("h1.title, .ten-truyen, h1.book-title").text() + "";
-    let coverEl = doc.select(".cover img, .anh-bia img, .book-cover img").first();
-    let cover = coverEl ? (coverEl.attr("src") + "") : "";
-    
-    let authorEl = doc.select(".author, .tac-gia, [itemprop=author]").first();
-    let author = authorEl ? (authorEl.text() + "") : "";
-    
-    let statusEl = doc.select(".status, .trang-thai").first();
-    let status = statusEl ? (statusEl.text() + "") : "";
-    
-    let descEl = doc.select(".description, .gioi-thieu, .novel-desc").first();
-    let description = descEl ? (descEl.html() + "") : "";
-    
-    if (cover.startsWith("//")) cover = "https:" + cover;
-    
-    let ongoing = !status.includes("Hoàn thành") && !status.includes("Completed") && 
-                 !status.includes("Hoàn") && !status.includes("End");
-    
-    let detail = "Tác giả: " + author + "<br>";
-    detail += "Trạng thái: " + status + "<br>";
-    detail += doc.select(".info, .thong-tin").text() + "";
-    
-    // Genres as objects with links
-    const genres = [];
-    doc.select(".genre a, .the-loai a, .tags a").forEach(function(el) {
-        let gTitle = el.text() + "";
-        let gHref = el.attr("href") + "";
-        if (gTitle && gHref) {
-            genres.push({
-                title: gTitle,
-                input: BASE_URL + gHref,
-                script: "gen.js"
-            });
-        }
-    });
-    
-    // Suggests (same author or related)
-    const suggests = [];
-    doc.select(".same-author a, .lien-quan a, .suggests a").forEach(function(el) {
-        let sTitle = el.text() + "";
-        let sHref = el.attr("href") + "";
-        if (sTitle && sHref) {
-            suggests.push({
-                title: sTitle,
-                input: BASE_URL + sHref,
-                script: "gen.js"
-            });
-        }
-    });
-    
-    // Comments (if available)
-    const comments = [];
-    let commentApi = doc.select("[data-comments-api]").attr("data-comments-api") + "";
-    if (commentApi) {
-        comments.push({
-            title: "Bình luận",
-            input: commentApi,
-            script: "comment.js"
-        });
+    // Bước 1: Normalize URL
+    url = url.replace(/^(?:https?:\/\/)?(?:[^@\n]+@)?(?:www\.)?([^:\/\n?]+)/img, BASE_URL);
+
+    var res = fetch(url);
+    if (!res.ok) return Response.error("Cannot load: " + res.status);
+
+    var doc = res.html();
+
+    // Bước 2: Tên truyện — selector thẻ chứa tên (thường là h1)
+    var nameEl = doc.select("SELECTOR_TITLE").first();
+    var name = (nameEl ? nameEl.text() : "") + "";
+
+    // Bước 3: Ảnh bìa — selector thẻ img, thử data-src trước (lazy-load)
+    var coverEl = doc.select("SELECTOR_COVER_IMG").first();
+    var cover = "";
+    if (coverEl) {
+        cover = (coverEl.attr("data-src") || coverEl.attr("src") || "") + "";
+        if (cover.startsWith("//")) cover = "https:" + cover;
+        if (cover && !cover.startsWith("http")) cover = BASE_URL + cover;
     }
-    
+
+    // Bước 4: Tác giả — selector link hoặc text tác giả
+    var authorEl = doc.select("SELECTOR_AUTHOR").first();
+    var author = (authorEl ? authorEl.text() : "") + "";
+
+    // Bước 5: Trạng thái — "Đang ra" / "Hoàn thành" / "Ongoing" / "Completed"
+    var statusEl = doc.select("SELECTOR_STATUS").first();
+    var status = (statusEl ? statusEl.text() : "") + "";
+    var ongoing = status.indexOf("Hoàn") === -1
+               && status.indexOf("Completed") === -1
+               && status.indexOf("Full") === -1
+               && status.indexOf("完结") === -1;
+
+    // Bước 6: Mô tả — selector container chứa tóm tắt, lấy html() để giữ định dạng
+    var descEl = doc.select("SELECTOR_DESCRIPTION").first();
+    var description = (descEl ? descEl.html() : "") + "";
+
+    // Bước 7: Thể loại — selector các thẻ <a> link thể loại
+    var genres = [];
+    doc.select("SELECTOR_GENRE_LINKS").forEach(function(el) {
+        var gTitle = el.text() + "";
+        var gHref  = (el.attr("href") || "") + "";
+        if (!gTitle || !gHref) return;
+        if (!gHref.startsWith("http")) gHref = BASE_URL + gHref;
+        genres.push({ title: gTitle, input: gHref, script: "gen.js" });
+    });
+
+    // Bước 8: Gợi ý — truyện liên quan hoặc cùng tác giả (tùy chọn)
+    var suggests = [];
+    // Cách đơn giản: tìm theo tác giả nếu có search.js
+    if (author) {
+        suggests.push({ title: "Cùng tác giả: " + author, input: author, script: "search.js" });
+    }
+
+    // Bước 9: Bình luận — chỉ thêm nếu site có API comment (Q9=Có)
+    // var comments = [{ title: "Bình luận", input: API_URL + "?page={{page}}", script: "comment.js" }];
+
     return Response.success({
-        name: name,
-        cover: cover,
-        host: BASE_URL,
-        author: author,
+        name:        name,
+        cover:       cover,
+        host:        BASE_URL,
+        author:      author,
         description: description,
-        detail: detail,
-        ongoing: ongoing,
-        genres: genres.length > 0 ? genres : undefined,
-        suggests: suggests.length > 0 ? suggests : undefined,
-        comments: comments.length > 0 ? comments : undefined
+        ongoing:     ongoing,
+        genres:      genres.length > 0 ? genres : undefined,
+        suggests:    suggests.length > 0 ? suggests : undefined
+        // comments: comments  // bỏ comment dòng này nếu có comment.js
     });
 }

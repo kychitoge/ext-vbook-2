@@ -1,6 +1,7 @@
 # 04_demo.md — Scripts & Plugin Reference
 
 > Code examples for all script types. Core reference for implementation.
+> **DO NOT use hardcoded selectors here** — use `mcp_vbook_inspect` to find real data.
 
 ---
 
@@ -12,13 +13,14 @@ ext-name/
 ├── src/
 │   ├── config.js   (required — BASE_URL)
 │   ├── detail.js*  (required)
-│   ├── page.js*    (required — dùng mặc định, xem giải thích bên dưới)
+│   ├── page.js*    (required — intermediary between detail and toc)
 │   ├── toc.js*     (required)
 │   ├── chap.js*    (required)
 │   ├── home.js     (optional)
 │   ├── genre.js    (optional)
-│   ├── gen.js      (optional — script dùng cho home/genre tab)
-│   └── search.js   (optional)
+│   ├── gen.js      (optional — generic list script for home/genre)
+│   ├── search.js   (optional)
+│   └── comment.js  (optional — if comments exist)
 ```
 
 ---
@@ -27,12 +29,12 @@ ext-name/
 ```json
 {
   "metadata": {
-    "name": "Tên Extension",
+    "name": "Extension Name",
     "author": "B",
     "version": 1,
     "source": "https://domain.net",
     "regexp": "https?:\\/\\/(?:www\\.)?domain\\.net\\/truyen\\/[a-zA-Z0-9-]+\\/?$",
-    "description": "Mô tả",
+    "description": "Description",
     "locale": "vi_VN",
     "language": "javascript",
     "type": "novel",
@@ -57,50 +59,50 @@ ext-name/
 
 ---
 
-## Luồng dữ liệu giữa các script
+## Data Flow Between Scripts
 
-### Luồng Home / Genre → Danh sách truyện
+### Home / Genre Flow → Book List
 
 ```
 home.js → execute()
-  └─ trả về [{title, input, script}]
+  └─ returns [{title, input, script}]
        └─ gen.js → execute(url=input, page="")
-            └─ trả về [{name, link, cover, description, host}], next
-                 └─ gen.js → execute(url=input, page=next)  ← lặp đến next=null
+            └─ returns [{name, link, cover, description, host}], next
+                 └─ gen.js → execute(url=input, page=next)  ← loops until next=null
 ```
 
 ```
 genre.js → execute()
-  └─ trả về [{title, input, script}]
-       └─ gen.js → execute(url=input, page="")   ← cùng pattern như home
+  └─ returns [{title, input, script}]
+       └─ gen.js → execute(url=input, page="")   ← same pattern as home
 ```
 
-### Luồng Mục lục (bắt buộc dùng page.js làm trung gian)
+### Table of Contents Flow (Mandatory page.js intermediary)
 
 ```
 detail.js → execute(url)
-  └─ trả về {name, cover, host, author, ...}
+  └─ returns {name, cover, host, author, ...}
 
-page.js → execute(url)          ← url = url của detail
-  └─ trả về [pageUrl1, pageUrl2, ...]
-       ← Nếu KHÔNG có phân trang: trả về [url] (chính là url detail)
-       ← Nếu CÓ phân trang: trả về list URL từng trang mục lục
+page.js → execute(url)          ← url = detail URL
+  └─ returns [pageUrl1, pageUrl2, ...]
+       ← If NO pagination: returns [url] (the detail URL itself)
+       ← If HAS pagination: returns array of URLs for each TOC page
 
-toc.js → execute(url)           ← url = từng item trong mảng page.js trả về
-  └─ trả về [{name, url, host}]
-       ← Mỗi call toc.js = 1 page mục lục
-       ← App tổng hợp tất cả kết quả từ các call
+toc.js → execute(url)           ← url = each item from the array returned by page.js
+  └─ returns [{name, url, host}]
+       ← Each toc.js call = 1 TOC page
+       ← App aggregates results from all calls
 
-chap.js → execute(url)          ← url = url chương từ toc.js
-  └─ trả về htmlString          ← Trả về HTML string trực tiếp, KHÔNG phải object
+chap.js → execute(url)          ← url = chapter URL from toc.js
+  └─ returns htmlString          ← Returns plain HTML string, NOT an object
 ```
 
-### Luồng Search
+### Search Flow
 
 ```
 search.js → execute(key, page="")
-  └─ trả về [{name, link, cover, description, host}], next
-       └─ search.js → execute(key, page=next)  ← lặp đến next=null
+  └─ returns [{name, link, cover, description, host}], next
+       └─ search.js → execute(key, page=next)  ← loops until next=null
 ```
 
 ---
@@ -111,61 +113,23 @@ search.js → execute(key, page="")
 |--------|-----------|-------|---------|
 | `home` | `execute()` | — | `[{title, input, script}]` |
 | `genre` | `execute()` | — | `[{title, input, script}]` |
-| `gen` | `execute(url, page)` | url từ home/genre, page từ next | `[{name*, link*, cover?, description?, host?}], next?` |
-| `search` | `execute(key, page)` | key = từ khóa, page từ next | `[{name*, link*, cover?, description?, host?}], next?` |
-| `detail` | `execute(url)` | url trang truyện (bỏ / cuối) | `{name*, cover, host, author, description, detail, ongoing*, genres?, suggests?, comments?}` |
-| `page` | `execute(url)` | url của detail | `[urlString, ...]` — luôn trả về mảng |
-| `toc` | `execute(url)` | url từng item trong mảng page.js | `[{name*, url*, host?}]` |
-| `chap` | `execute(url)` | url chương từ toc.js | `htmlString` |
-| `comment` | `execute(input, next)` | từ comments trong detail | `[{name, content, description}], next?` |
+| `gen` | `execute(url, page)` | url from home/genre, page from next | `[{name*, link*, cover?, description?, host?}], next?` |
+| `search` | `execute(key, page)` | key = keyword, page from next | `[{name*, link*, cover?, description?, host?}], next?` |
+| `detail` | `execute(url)` | book detail URL | `{name*, cover, host, author, description, ongoing*, genres?, suggests?, comments?}` |
+| `page` | `execute(url)` | detail URL | `[urlString, ...]` — always an array |
+| `toc` | `execute(url)` | each item from page.js array | `[{name*, url*, host?}]` |
+| `chap` | `execute(url)` | chapter URL from toc.js | `htmlString` |
+| `comment` | `execute(input, next)` | from comments in detail | `[{name, content, description}], next?` |
 
-**next** luôn phải là **string** hoặc **null** — KHÔNG được là number.
+**next** must always be a **string** or **null** — NEVER a number.
 
 ---
 
-## page.js ← QUY TẮC QUAN TRỌNG
-
-`page.js` là **bắt buộc** và là **trung gian** giữa detail và toc.
-
-- **Nếu trang KHÔNG phân trang mục lục** → trả về mảng 1 phần tử là chính url detail:
-  ```js
-  return Response.success([url]);
-  ```
-- **Nếu trang CÓ phân trang** → trả về mảng các URL từng trang mục lục
-- App sẽ gọi `toc.js` lần lượt với từng item trong mảng
-
+## config.js (Mandatory)
 ```js
-// page.js — không có phân trang
-function execute(url) {
-    url = url.replace(/^(?:https?:\/\/)?(?:www\.)?([^\/]+)/, BASE_URL);
-    if (url.slice(-1) === "/") url = url.slice(0, -1);
-    // Mục lục nằm ngay trên trang detail → trả về [url] để toc.js tự parse
-    return Response.success([url]);
-}
-
-// page.js — CÓ phân trang (ví dụ: page/1, page/2, ...)
-function execute(url) {
-    url = url.replace(/^(?:https?:\/\/)?(?:www\.)?([^\/]+)/, BASE_URL);
-    if (url.slice(-1) === "/") url = url.slice(0, -1);
-
-    let response = fetch(url);
-    if (!response.ok) return Response.error("Cannot load: " + response.status);
-    let doc = response.html();
-
-    let pages = [];
-    // TODO: tìm số trang mục lục
-    doc.select(".pagination a, .page-list a").forEach(function(el) {
-        let href = el.attr("href") + "";
-        if (href && !href.includes("#")) {
-            if (!href.startsWith("http")) href = BASE_URL + href;
-            pages.push(href);
-        }
-    });
-
-    // Fallback: không tìm thấy phân trang → trả về [url]
-    if (pages.length === 0) return Response.success([url]);
-    return Response.success(pages);
-}
+// Use let (NOT const) so VBook can inject CONFIG_URL
+let BASE_URL = "https://domain.net";
+try { if (CONFIG_URL) BASE_URL = CONFIG_URL; } catch(e) {}
 ```
 
 ---
@@ -173,39 +137,38 @@ function execute(url) {
 ## home.js
 ```js
 function execute() {
+    // Returns tab list. "input" is URL for gen.js, {{page}} is auto-injected.
+    // TODO: Update paths based on actual site structure
     return Response.success([
-        { title: "Mới cập nhật", input: BASE_URL + "/danh-sach/trang/{{page}}", script: "gen.js" },
-        { title: "Hot", input: BASE_URL + "/truyen-hot/trang/{{page}}", script: "gen.js" },
-        { title: "Hoàn thành", input: BASE_URL + "/hoan-thanh/trang/{{page}}", script: "gen.js" },
-        { title: "Thể loại", input: BASE_URL + "/the-loai", script: "genre.js" }
+        { title: "Latest",    input: BASE_URL + "/PATH_LATEST/{{page}}", script: "gen.js" },
+        { title: "Hot",       input: BASE_URL + "/PATH_HOT/{{page}}",    script: "gen.js" },
+        { title: "Completed", input: BASE_URL + "/PATH_DONE/{{page}}",   script: "gen.js" },
+        { title: "Genres",    input: BASE_URL + "/PATH_GENRES",          script: "genre.js" }
     ]);
 }
 ```
 
-> Dùng `{{page}}` trong `input` để app tự inject số trang.
+> Use `{{page}}` in `input` for automatic pagination injection.
 
 ---
 
 ## genre.js
 ```js
 function execute() {
-    let response = fetch(BASE_URL + "/the-loai");
-    if (!response.ok) return Response.error("Cannot load genres");
+    // TODO: Replace PATH_GENRES with actual genre list URL
+    var res = fetch(BASE_URL + "/PATH_GENRES");
+    if (!res.ok) return Response.error("Cannot load genres");
 
-    let doc = response.html();
-    const genres = [];
+    var doc = res.html();
+    var genres = [];
 
-    doc.select(".genre-list a, .list-genres a").forEach(function(el) {
-        let title = el.text() + "";
-        let href = el.attr("href") + "";
-        if (title && href) {
-            if (!href.startsWith("http")) href = BASE_URL + href;
-            genres.push({
-                title: title,
-                input: href,
-                script: "gen.js"
-            });
-        }
+    // TODO: Selector for <a> tags of each genre link
+    doc.select("SELECTOR_GENRE_LINKS").forEach(function(el) {
+        var title = el.text() + "";
+        var href  = (el.attr("href") || "") + "";
+        if (!title || !href) return;
+        if (!href.startsWith("http")) href = BASE_URL + href;
+        genres.push({ title: title, input: href, script: "gen.js" });
     });
 
     return Response.success(genres);
@@ -216,40 +179,49 @@ function execute() {
 
 ## gen.js
 ```js
+// Contract: execute(url, page) → [{name*, link*, cover?, description?, host?}], nextPage?
+// CRITICAL: nextPage must be a string, not a number!
 function execute(url, page) {
     if (!page) page = "1";
 
-    // TODO: Điều chỉnh pattern phân trang theo từng site
-    let pageUrl = url.replace("{{page}}", page);
+    // TODO: Adjust pagination pattern (replace {{page}}, or ?page=N, or /page/N)
+    var pageUrl = url.replace("{{page}}", page);
 
-    let response = fetch(pageUrl);
-    if (!response.ok) return Response.error("Error: " + response.status);
+    var res = fetch(pageUrl);
+    if (!res.ok) return Response.error("Error: " + res.status);
 
-    let doc = response.html();
-    const data = [];
+    var doc = res.html();
+    var data = [];
 
-    // TODO: Cập nhật selector theo site thực tế
-    doc.select(".book-list .item").forEach(function(el) {
-        let name = el.select(".title a").text() + "";
-        let link = el.select(".title a").attr("href") + "";
-        let cover = el.select("img").attr("src") + "";
-        let desc = el.select(".desc").text() + "";
+    // TODO: [1] Selector for each book container (e.g., .item, li, article)
+    doc.select("SELECTOR_ITEM").forEach(function(el) {
 
-        if (name && link) {
-            if (!link.startsWith("http")) link = BASE_URL + link;
-            if (cover.startsWith("//")) cover = "https:" + cover;
-            data.push({
-                name: name,
-                link: link,
-                cover: cover,
-                description: desc,
-                host: BASE_URL
-            });
-        }
+        // TODO: [2] Selector for <a> tag containing name + link (inside container)
+        var linkEl = el.select("SELECTOR_TITLE_LINK").first();
+
+        // TODO: [3] Selector for <img> cover — prioritize data-src (lazy-load)
+        var imgEl  = el.select("img").first();
+
+        if (!linkEl) return;
+        var link = (linkEl.attr("href") || "") + "";
+        if (!link) return;
+        if (!link.startsWith("http")) link = BASE_URL + link;
+
+        var cover = imgEl ? ((imgEl.attr("data-src") || imgEl.attr("src") || "") + "") : "";
+        if (cover.startsWith("//")) cover = "https:" + cover;
+
+        data.push({
+            name:        linkEl.text().trim() + "",
+            link:        link,
+            cover:       cover,
+            description: "",
+            host:        BASE_URL
+        });
     });
 
-    let hasNext = doc.select("a.next, .pagination .next").size() > 0;
-    let nextPage = (hasNext && data.length > 0) ? String(parseInt(page) + 1) : null;
+    // TODO: [4] Selector to check for next page (a[rel=next], .pagination .next, etc.)
+    var hasNext = doc.select("SELECTOR_NEXT_PAGE").size() > 0;
+    var nextPage = hasNext ? String(parseInt(page) + 1) : null;
 
     return Response.success(data, nextPage);
 }
@@ -259,37 +231,36 @@ function execute(url, page) {
 
 ## search.js
 ```js
+// Contract: execute(key, page) → [{name*, link*, cover?, description?, host?}], next?
 function execute(key, page) {
     if (!page) page = "1";
 
-    // TODO: Cập nhật URL search theo site thực tế
-    let response = fetch(BASE_URL + "/tim-kiem/", {
-        queries: { tukhoa: key, page: page }
+    // TODO: Adjust search URL and query params
+    // Option 1: fetch(url, { queries: { q: key, page: page } })
+    // Option 2: fetch(BASE_URL + "/search?q=" + encodeURIComponent(key) + "&page=" + page)
+    var res = fetch(BASE_URL + "/PATH_SEARCH", {
+        queries: { PARAM_KEYWORD: key, PARAM_PAGE: page }
     });
-    if (!response.ok) return Response.error("Search failed");
+    if (!res.ok) return Response.error("Search failed: " + res.status);
 
-    let doc = response.html();
-    const data = [];
+    var doc = res.html();
+    var data = [];
 
-    doc.select(".search-result .item").forEach(function(el) {
-        let name = el.select(".title").text() + "";
-        let link = el.select("a").attr("href") + "";
-        let cover = el.select("img").attr("src") + "";
-        let desc = el.select(".desc").text() + "";
-
-        if (name && link) {
-            if (!link.startsWith("http")) link = BASE_URL + link;
-            data.push({
-                name: name,
-                link: link,
-                cover: cover,
-                description: desc,
-                host: BASE_URL
-            });
-        }
+    // TODO: Selector same as gen.js
+    doc.select("SELECTOR_ITEM").forEach(function(el) {
+        var linkEl = el.select("SELECTOR_TITLE_LINK").first();
+        var imgEl  = el.select("img").first();
+        if (!linkEl) return;
+        var link = (linkEl.attr("href") || "") + "";
+        if (!link) return;
+        if (!link.startsWith("http")) link = BASE_URL + link;
+        var cover = imgEl ? ((imgEl.attr("data-src") || imgEl.attr("src") || "") + "") : "";
+        if (cover.startsWith("//")) cover = "https:" + cover;
+        data.push({ name: linkEl.text().trim() + "", link: link, cover: cover, description: "", host: BASE_URL });
     });
 
-    return Response.success(data, data.length > 0 ? String(parseInt(page) + 1) : null);
+    var hasNext = doc.select("SELECTOR_NEXT_PAGE").size() > 0;
+    return Response.success(data, hasNext ? String(parseInt(page) + 1) : null);
 }
 ```
 
@@ -297,63 +268,116 @@ function execute(key, page) {
 
 ## detail.js
 ```js
+// Contract: execute(url) → { name*, cover, host, author, description, ongoing:bool*,
+//                             genres?:[{title,input,script}], suggests?:[...], comments?:[...] }
 function execute(url) {
     url = url.replace(/^(?:https?:\/\/)?(?:www\.)?([^\/]+)/, BASE_URL);
     if (url.slice(-1) === "/") url = url.slice(0, -1);
 
-    let response = fetch(url);
-    if (!response.ok) return Response.error("Cannot load: " + response.status);
+    var res = fetch(url);
+    if (!res.ok) return Response.error("Cannot load: " + res.status);
+    var doc = res.html();
 
-    let doc = response.html();
+    // TODO: [1] Selector for book name (usually h1)
+    var nameEl = doc.select("SELECTOR_TITLE").first();
+    var name = (nameEl ? nameEl.text() : "") + "";
 
-    // TODO: Cập nhật selector theo site thực tế
-    let name = doc.select("h1.title, .ten-truyen, h1.book-title").text() + "";
-    let coverEl = doc.select(".cover img, .anh-bia img, .book-cover img").first();
-    let cover = coverEl ? (coverEl.attr("src") + "") : "";
-
-    let authorEl = doc.select(".author, .tac-gia, [itemprop=author]").first();
-    let author = authorEl ? (authorEl.text() + "") : "";
-
-    let statusEl = doc.select(".status, .trang-thai").first();
-    let status = statusEl ? (statusEl.text() + "") : "";
-
-    let descEl = doc.select(".description, .gioi-thieu, .novel-desc").first();
-    let description = descEl ? (descEl.html() + "") : "";
-
-    if (cover.startsWith("//")) cover = "https:" + cover;
-    if (cover && !cover.startsWith("http")) cover = BASE_URL + cover;
-
-    let ongoing = !status.includes("Hoàn thành") && !status.includes("Completed") &&
-                  !status.includes("Hoàn") && !status.includes("End");
-
-    let detail = "Tác giả: " + author + "<br>Trạng thái: " + status;
-
-    const genres = [];
-    doc.select(".genre a, .the-loai a, .tags a").forEach(function(el) {
-        let gTitle = el.text() + "";
-        let gHref = el.attr("href") + "";
-        if (gTitle && gHref) {
-            if (!gHref.startsWith("http")) gHref = BASE_URL + gHref;
-            genres.push({ title: gTitle, input: gHref, script: "gen.js" });
-        }
-    });
-
-    const suggests = [];
-    if (author) {
-        suggests.push({ title: "Cùng tác giả: " + author, input: author, script: "search.js" });
+    // TODO: [2] Selector for cover <img> — prioritize data-src
+    var coverEl = doc.select("SELECTOR_COVER_IMG").first();
+    var cover = "";
+    if (coverEl) {
+        cover = (coverEl.attr("data-src") || coverEl.attr("src") || "") + "";
+        if (cover.startsWith("//")) cover = "https:" + cover;
+        if (cover && !cover.startsWith("http")) cover = BASE_URL + cover;
     }
 
-    return Response.success({
-        name: name,
-        cover: cover,
-        host: BASE_URL,
-        author: author,
-        description: description,
-        detail: detail,
-        ongoing: ongoing,
-        genres: genres.length > 0 ? genres : undefined,
-        suggests: suggests.length > 0 ? suggests : undefined
+    // TODO: [3] Selector for author (usually <a> or <span>)
+    var authorEl = doc.select("SELECTOR_AUTHOR").first();
+    var author = (authorEl ? authorEl.text() : "") + "";
+
+    // TODO: [4] Selector for status ("Ongoing" / "Completed" / etc.)
+    var statusEl = doc.select("SELECTOR_STATUS").first();
+    var status = (statusEl ? statusEl.text() : "") + "";
+    var ongoing = status.indexOf("Hoàn") === -1
+               && status.indexOf("Completed") === -1
+               && status.indexOf("Full") === -1
+               && status.indexOf("完结") === -1;
+
+    // TODO: [5] Selector for description container — use html() to keep formatting
+    var descEl = doc.select("SELECTOR_DESCRIPTION").first();
+    var description = (descEl ? descEl.html() : "") + "";
+
+    // TODO: [6] Selector for genre <a> links
+    var genres = [];
+    doc.select("SELECTOR_GENRE_LINKS").forEach(function(el) {
+        var gTitle = el.text() + "";
+        var gHref  = (el.attr("href") || "") + "";
+        if (!gTitle || !gHref) return;
+        if (!gHref.startsWith("http")) gHref = BASE_URL + gHref;
+        genres.push({ title: gTitle, input: gHref, script: "gen.js" });
     });
+
+    var suggests = [];
+    if (author) {
+        suggests.push({ title: "Same Author: " + author, input: author, script: "search.js" });
+    }
+
+    // If using comment.js, uncomment below:
+    // var comments = [{ title: "Comments", input: COMMENT_API_URL + "?page={{page}}", script: "comment.js" }];
+
+    return Response.success({
+        name:        name,
+        cover:       cover,
+        host:        BASE_URL,
+        author:      author,
+        description: description,
+        ongoing:     ongoing,
+        genres:      genres.length > 0 ? genres : undefined,
+        suggests:    suggests.length > 0 ? suggests : undefined
+        // comments: comments
+    });
+}
+```
+
+---
+
+## page.js ← CRITICAL RULE
+
+`page.js` is **mandatory** and acts as an **intermediary** between detail and toc.
+
+- **If NO TOC pagination** → return array with one element (the detail URL)
+- **If HAS TOC pagination** → return array of URLs for each TOC page
+- App will call `toc.js` for each item in the returned array
+
+```js
+// CASE 1: No pagination — TOC is on the detail page itself
+function execute(url) {
+    url = url.replace(/^(?:https?:\/\/)?(?:www\.)?([^\/]+)/, BASE_URL);
+    if (url.slice(-1) === "/") url = url.slice(0, -1);
+    return Response.success([url]);
+}
+
+// CASE 2: TOC has pagination
+function execute(url) {
+    url = url.replace(/^(?:https?:\/\/)?(?:www\.)?([^\/]+)/, BASE_URL);
+    if (url.slice(-1) === "/") url = url.slice(0, -1);
+
+    var res = fetch(url);
+    if (!res.ok) return Response.error("Cannot load: " + res.status);
+    var doc = res.html();
+
+    var pages = [];
+    // TODO: Selector for TOC pagination links
+    // e.g., ".pagination a", "a[href*='page/']", ".page-list a"
+    doc.select("SELECTOR_TOC_PAGINATION").forEach(function(el) {
+        var href = (el.attr("href") || "") + "";
+        if (!href || href.indexOf("#") > -1) return;
+        if (!href.startsWith("http")) href = BASE_URL + href;
+        if (pages.indexOf(href) === -1) pages.push(href);
+    });
+
+    if (pages.length === 0) return Response.success([url]);
+    return Response.success(pages);
 }
 ```
 
@@ -361,40 +385,32 @@ function execute(url) {
 
 ## toc.js
 ```js
-// toc.js nhận url từ page.js — mỗi call xử lý 1 trang mục lục
+// toc.js receives URL from page.js — each call handles one TOC page
 function execute(url) {
     url = url.replace(/^(?:https?:\/\/)?(?:www\.)?([^\/]+)/, BASE_URL);
     if (url.slice(-1) === "/") url = url.slice(0, -1);
 
-    let response = fetch(url);
-    if (!response.ok) return Response.error("Cannot load: " + response.status);
+    var res = fetch(url);
+    if (!res.ok) return Response.error("Cannot load: " + res.status);
+    var doc = res.html();
+    var chapters = [];
+    var seen = {};
 
-    let doc = response.html();
-    const chapters = [];
-
-    // TODO: Cập nhật selector danh sách chương theo site thực tế
-    doc.select(".chapter-list a, .danh-sach-chuong a, #list-chapter a").forEach(function(el) {
-        let name = el.text() + "";
-        let chapterUrl = el.attr("href") + "";
-
-        if (name && chapterUrl) {
-            if (!chapterUrl.startsWith("http")) {
-                chapterUrl = chapterUrl.startsWith("/") ? BASE_URL + chapterUrl : BASE_URL + "/" + chapterUrl;
-            }
-            let isPaid = el.select(".vip, .paid, .lock").size() > 0;
-            chapters.push({
-                name: name,
-                url: chapterUrl,
-                host: BASE_URL,
-                pay: isPaid || undefined
-            });
+    // TODO: Selector for chapter <a> links in TOC
+    // e.g., "#list-chapter a", ".chapter-list a", ".ds-chap a"
+    doc.select("SELECTOR_CHAPTER_LINKS").forEach(function(el) {
+        var name    = el.text().trim() + "";
+        var chapUrl = (el.attr("href") || "") + "";
+        if (!name || !chapUrl || seen[chapUrl]) return;
+        seen[chapUrl] = true;
+        if (!chapUrl.startsWith("http")) {
+            chapUrl = chapUrl.startsWith("/") ? BASE_URL + chapUrl : BASE_URL + "/" + chapUrl;
         }
+        var isPaid = el.select(".vip, .paid, .lock").size() > 0;
+        chapters.push({ name: name, url: chapUrl, host: BASE_URL, pay: isPaid || undefined });
     });
 
-    if (chapters.length === 0) {
-        return Response.error("No chapters found");
-    }
-
+    if (chapters.length === 0) return Response.error("No chapters found");
     return Response.success(chapters);
 }
 ```
@@ -403,25 +419,24 @@ function execute(url) {
 
 ## chap.js
 ```js
-// chap.js trả về HTML string trực tiếp — KHÔNG phải object!
+// chap.js returns plain HTML string directly — NOT an object!
 function execute(url) {
     url = url.replace(/^(?:https?:\/\/)?(?:www\.)?([^\/]+)/, BASE_URL);
 
-    let response = fetch(url);
-    if (!response.ok) return Response.error("Cannot load: " + response.status);
+    var res = fetch(url);
+    if (!res.ok) return Response.error("Cannot load: " + res.status);
+    var doc = res.html();
 
-    let doc = response.html();
+    // Remove ads before extracting content
+    doc.select("script, style, ins, iframe, .ads, .advertisement, .banner").remove();
 
-    doc.select(".ads, .advertisement, script, style, noscript, .banner").remove();
+    // TODO: Selector for the chapter content container (novel text)
+    // e.g., "#chapter-content", ".chapter-c", "#content", ".box-chap"
+    var contentEl = doc.select("SELECTOR_CONTENT").first();
+    if (!contentEl) return Response.error("No content found");
 
-    // TODO: Cập nhật selector nội dung chương theo site thực tế
-    let content = doc.select("#chapter-content, .chapter-c, #content, .chapter-content").html() + "";
-
-    if (!content || content === "null") return Response.error("No content found");
-
+    var content = contentEl.html() + "";
     content = content.replace(/&nbsp;/g, " ");
-    content = content.replace(/\s+/g, " ");
-    content = content.trim();
 
     return Response.success(content);
 }
@@ -429,29 +444,42 @@ function execute(url) {
 
 ---
 
-## config.js (Bắt buộc)
+## chap.js (Comic — returns images)
 ```js
-let BASE_URL = "https://domain.net";
-try { if (CONFIG_URL) BASE_URL = CONFIG_URL; } catch(e) {}
+// Comic: returns HTML containing <img> tags — VBook auto-parses for viewer
+function execute(url) {
+    url = url.replace(/^(?:https?:\/\/)?(?:www\.)?([^\/]+)/, BASE_URL);
+
+    var res = fetch(url);
+    if (!res.ok) return Response.error("Cannot load: " + res.status);
+    var doc = res.html();
+    doc.select("script, style, .ads").remove();
+
+    // TODO: Selector for the container holding all page images
+    // e.g., ".chapter-content", "#chapter-images", ".reading-content"
+    var container = doc.select("SELECTOR_IMAGE_CONTAINER").first();
+    if (!container) return Response.error("No images found");
+
+    // Resolve lazy-load: map data-src → src
+    container.select("img[data-src]").forEach(function(img) {
+        var s = img.attr("data-src") + "";
+        if (s) img.attr("src", s);
+    });
+
+    return Response.success(container.html() + "");
+}
 ```
 
 ---
 
-## utils.js (Helper thường dùng)
+## utils.js (Optional Helper)
 ```js
 function normalizeUrl(url, base) {
     if (!url) return "";
+    url = url + "";
     if (url.startsWith("//")) return "https:" + url;
     if (url.startsWith("/")) return base + url;
     if (!url.startsWith("http")) return base + "/" + url;
     return url;
-}
-
-function cleanText(text) {
-    if (!text) return "";
-    return text.toString()
-        .replace(/&nbsp;/g, " ")
-        .replace(/\s+/g, " ")
-        .trim();
 }
 ```

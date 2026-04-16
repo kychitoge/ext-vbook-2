@@ -1,41 +1,42 @@
+// toc.js — Mục lục chương
+// Contract: execute(url) → [{ name*, url*, host? }]
+// Được gọi lần lượt với từng URL từ page.js (mỗi call = 1 trang mục lục)
 function execute(url) {
-    // toc.js: nhận url từ page.js (có thể là url detail hoặc url trang mục lục phân trang)
-    // Mỗi lần gọi = 1 trang mục lục. App tổng hợp kết quả từ tất cả các call.
-    url = url.replace(/^(?:https?:\/\/)?(?:www\.)?([^\/]+)/, BASE_URL);
+    url = url.replace(/^(?:https?:\/\/)?(?:[^@\n]+@)?(?:www\.)?([^:\/\n?]+)/img, BASE_URL);
     if (url.slice(-1) === "/") url = url.slice(0, -1);
 
-    let response = fetch(url);
-    if (!response.ok) return Response.error("Cannot load: " + response.status);
+    var res = fetch(url);
+    if (!res.ok) return Response.error("Cannot load: " + res.status);
 
-    let doc = response.html();
-    const chapters = [];
+    var doc = res.html();
+    var chapters = [];
+    var seen = {};
 
-    // TODO: Cập nhật selector danh sách chương theo site thực tế
-    // Novel: chapters typically in a list, ordered by oldest→newest or newest→oldest
-    doc.select(".chapter-list a, .danh-sach-chuong a, #list-chapter a, .chuong-list a").forEach(function(el) {
-        let name = el.text() + "";
-        let chapterUrl = el.attr("href") + "";
+    // TODO: Selector các thẻ <a> của từng chương trong mục lục
+    // Thường là: "#list-chapter a", ".chapter-list a", ".danh-sach a"
+    doc.select("SELECTOR_CHAPTER_LINKS").forEach(function(el) {
+        var name     = el.text().trim() + "";
+        var chapUrl  = (el.attr("href") || "") + "";
 
-        if (name && chapterUrl) {
-            if (!chapterUrl.startsWith("http")) {
-                chapterUrl = chapterUrl.startsWith("/") ? BASE_URL + chapterUrl : BASE_URL + "/" + chapterUrl;
-            }
+        if (!name || !chapUrl) return;
+        if (seen[chapUrl]) return;
+        seen[chapUrl] = true;
 
-            // Check for VIP/paid chapters
-            let isPaid = el.select(".vip, .paid, .lock").size() > 0;
-
-            chapters.push({
-                name: name,
-                url: chapterUrl,
-                host: BASE_URL,
-                pay: isPaid || undefined
-            });
+        if (!chapUrl.startsWith("http")) {
+            chapUrl = chapUrl.startsWith("/") ? BASE_URL + chapUrl : BASE_URL + "/" + chapUrl;
         }
+
+        // Phát hiện chương VIP/trả phí
+        var isPaid = el.select(".vip, .paid, .lock, .khoa").size() > 0;
+
+        chapters.push({
+            name: name,
+            url:  chapUrl,
+            host: BASE_URL,
+            pay:  isPaid || undefined
+        });
     });
 
-    if (chapters.length === 0) {
-        return Response.error("No chapters found");
-    }
-
+    if (chapters.length === 0) return Response.error("No chapters found");
     return Response.success(chapters);
 }

@@ -104,27 +104,6 @@ const TOOLS = [
         }
     },
     {
-        name: 'create_smart',
-        description: 'Smart scaffold — inspects ALL provided URLs on the VBook device first, scores CSS selectors by actual match count, then generates scripts with REAL selectors (no generic placeholders). PREFERRED over create for new extensions.',
-        inputSchema: {
-            type: 'object',
-            properties: {
-                name: { type: 'string', description: 'Extension directory name (no spaces, e.g. truyenfull)' },
-                source: { type: 'string', description: 'Source website URL (e.g. https://truyenfull.io)' },
-                type: { type: 'string', enum: ['novel', 'comic', 'chinese_novel', 'translate', 'tts'], description: 'Extension type' },
-                url_home: { type: 'string', description: 'URL of book list page (for gen.js inspection)' },
-                url_detail: { type: 'string', description: 'URL of a specific book detail page' },
-                url_toc: { type: 'string', description: 'URL of chapter list / table of contents page' },
-                url_chap: { type: 'string', description: 'URL of a chapter reading page' },
-                locale: { type: 'string', description: 'Locale code (vi_VN, zh_CN, en_US)', default: 'vi_VN' },
-                tag: { type: 'string', description: 'Optional tag (e.g. nsfw)' },
-                has_search: { type: 'boolean', description: 'Site has search feature' },
-                has_genre: { type: 'boolean', description: 'Site has genre/category pages' }
-            },
-            required: ['name', 'source', 'type', 'url_home', 'url_detail', 'url_toc', 'url_chap']
-        }
-    },
-    {
         name: 'validate',
         description: 'Validate extension structure, plugin.json fields, and Rhino (ES6 subset) compatibility. Fix all errors before debugging.',
         inputSchema: {

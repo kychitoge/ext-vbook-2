@@ -1,6 +1,7 @@
 # 05_repair.md — Extension Repair Guide
 
 > Step-by-step guide for fixing broken extensions.
+> **FORBIDDEN: Guessing selectors** — ALWAYS use `mcp_vbook_inspect` to get real device data.
 
 ---
 
@@ -21,10 +22,10 @@ Read first:
 - `extensions/<name>/src/*.js` → current implementation
 
 Identify failing script:
-- "không load truyện" → test detail.js
-- "không có chapter" → test toc.js
-- "đọc bị lỗi" → test chap.js
-- "trang chủ trống" → test home.js or gen.js
+- "no books loading" → test detail.js
+- "no chapters found" → test toc.js
+- "reading errors" → test chap.js
+- "home empty" → test home.js or gen.js
 
 ---
 
@@ -48,13 +49,11 @@ Check JSON response:
 ### STEP 3 — Diagnose Root Cause
 
 **Check if website changed:**
-```bash
-vbook analyze "<source_url>" --json
-```
+- **AI MUST** run `mcp_vbook_inspect(url)` to see the current DOM structure on the actual device.
+- Compare selectors in the code vs the inspect output.
 
-Compare selectors in code vs analyze output.
-
-Also check for Cloudflare: `"cloudflare": true` → need `Engine.newBrowser()`.
+Also check for Cloudflare using `mcp_vbook_analyze(url)`:
+- `"cloudflare": true` → the site requires `Engine.newBrowser()`.
 
 ---
 
@@ -62,27 +61,28 @@ Also check for Cloudflare: `"cloudflare": true` → need `Engine.newBrowser()`.
 
 **Selector changed:**
 ```js
-// OLD
-var name = doc.select(".truyen-title a").text();
+// OLD (failing)
+var name = doc.select("OLD_SELECTOR").first().text();
 
-// NEW
-var name = doc.select("h1.book-name, .title-info h1").text();
+// NEW (fixed via mcp_vbook_inspect)
+var name = doc.select("NEW_SELECTOR").first().text();
 ```
 
 **Cloudflare protection:**
 ```js
 var b = Engine.newBrowser();
-b.setUserAgent(UserAgent.android);
+b.setUserAgent(UserAgent.android());
 try {
     b.launch(url, 12000);
     var doc = b.html();
+    // Parse using doc...
 } finally {
     b.close();
 }
 ```
 
 **Domain changed:**
-1. Update `src/config.js` with new BASE_URL
+1. Update `src/config.js` with new `BASE_URL`
 2. Update `plugin.json`:
 ```json
 {
@@ -130,7 +130,7 @@ Report: old version → new version, what changed.
 ```
 Extension broken
 ├── No data from detail.js?
-│   ├── Run: vbook analyze <source_url>
+│   ├── Run: mcp_vbook_inspect <url>
 │   ├── Update selectors
 │   └── Cloudflare? → Engine.newBrowser()
 │
@@ -140,6 +140,7 @@ Extension broken
 │
 ├── Chap content empty?
 │   ├── Content in different container
+│   ├── Use mcp_vbook_inspect to find correct content selector
 │   └── Check iframe
 │
 └── Search returns nothing?
@@ -154,8 +155,9 @@ Extension broken
 # Pinpoint failing script
 vbook debug src/<script>.js -in "<url>" --json
 
-# Analyze website
-vbook analyze "<url>" --json
+# Inspect website structure on device
+# (Run via MCP tool, not CLI)
+mcp_vbook_inspect(url)
 
 # Validate syntax
 vbook validate ./<name>

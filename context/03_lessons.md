@@ -6,17 +6,17 @@
 
 ## 1. Icon Verification — ALWAYS Check After Scaffold
 
-**Problem:** Scaffold downloads favicon automatically. If site uses SVG, redirect, or returns HTML → `icon.png` = corrupted.
+**Problem:** Scaffold downloads favicon automatically. If the site uses SVG, redirects, or returns HTML → `icon.png` = corrupted.
 
-**Rule:** After scaffold, verify `icon.png` is valid image:
+**Rule:** After scaffold, verify `icon.png` is a valid image:
 - View file visually (binary check)
-- If HTML/text → manually download correct logo as PNG (64x64px)
+- If HTML/text → manually download the correct logo as PNG (64x64px)
 
 ---
 
 ## 2. Regexp Must Be Complete and Strict
 
-**Problem:** Simple regexp misses protocol/www, doesn't anchor properly.
+**Problem:** Simple regex misses protocol/www or doesn't anchor properly.
 
 **Correct pattern:**
 ```
@@ -31,106 +31,69 @@ https?:\/\/(?:www\.)?domain\.net\/truyen\/[a-zA-Z0-9-]+\/?$
 
 ---
 
-## 3. page.js + toc.js Integration
+## 3. page.js + toc.js Integration (API-based TOC)
 
-**Problem:** page.js returns array of pagination URLs (or parentIds). toc.js is called with each URL from page.js array. But toc.js was trying to fetch detail page to get parentId, not from API URL params.
+**Problem:** `page.js` returns an array of pagination URLs (or IDs). `toc.js` is called with each input from that array. A common mistake is trying to fetch the detail page inside `toc.js` even when it was called with an API URL.
 
 **Solution:**
-1. `page.js` → returns array of API URLs or parentId values
+1. `page.js` → returns an array of API URLs or IDs.
 2. `toc.js` must handle both:
-   - Called with detail URL → parse parentId from page, then fetch all pages
-   - Called with API URL from page.js → extract parentId & page from URL params, only fetch that specific page
-
-**Example toc.js pattern:**
-```js
-function execute(url) {
-    var parentId = null;
-    var pageNum = 1;
-    var isApiCall = (url.indexOf("admin-ajax.php") > -1);
-    
-    if (isApiCall) {
-        // Extract from API URL
-        var parentMatch = url.match(/parent_id=(\d+)/);
-        var pageMatch = url.match(/page=(\d+)/);
-        parentId = parentMatch ? parentMatch[1] : null;
-        pageNum = pageMatch ? parseInt(pageMatch[1]) : 1;
-    } else {
-        // Parse from detail page
-        var response = fetch(url);
-        var doc = response.text();
-        var match = doc.match(/postid-(\d+)/);
-        parentId = match ? match[1] : null;
-    }
-    
-    var chapters = [];
-    // Fetch API for pageNum...
-    // If isApiCall, stop after 1 page
-    // Else loop through all pages
-    
-    return Response.success(chapters);
-}
-```
+   - Called with detail URL → parse IDs from the page, then fetch API.
+   - Called with API URL directly → extract params and return data.
 
 ---
 
-## 4. Pagination Detection — Check Page Count First
+## 4. Pagination Detection
 
-**Problem:** Extending TOC for novels with many chapters needs pagination. But some sites don't show page count upfront.
+**Problem:** Extending TOC for novels with many chapters needs pagination. Some sites don't show page count upfront or hide it behind JS.
 
-**Solution:** Check HTML for pagination patterns:
-- `.pagination` or `.pager` elements
-- Page numbers like "Page 1 of X"
-- "Load more" buttons
-- API responses indicating more pages
+**Solution:** 
+- Use `mcp_vbook_inspect` to check for pagination elements.
+- Look for common markers like `.pagination`, `a.next`, or "Page X of Y".
+- If hidden by JS, use `Engine.newBrowser()` in `page.js`.
 
 ---
 
-## 5. AJAX/POST Requests Need Proper Headers
+## 5. AJAX/POST Requests
 
-**Problem:** WordPress AJAX endpoints return 403 without proper headers.
+**Problem:** Some AJAX endpoints return 403 or empty data without specific headers.
 
 **Solution:**
-```js
-fetch(ajaxUrl, {
-    method: "POST",
-    headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        "X-Requested-With": "XMLHttpRequest"
-    },
-    body: "action=nt_load_chapters&parent_id=" + parentId
-})
-```
+- Always check `mcp_vbook_analyze` for XHR calls and their headers.
+- Common mandatory headers: `Content-Type: application/x-www-form-urlencoded`, `X-Requested-With: XMLHttpRequest`.
 
 ---
 
-## 6. Chapter Sorting — Extract Numbers
+## 6. Chapter Sorting
 
-**Problem:** Chapters come unsorted from paginated API pages.
+**Problem:** Chapters may come unsorted from certain APIs (e.g., from oldest to newest or vice versa, or random).
 
-**Solution:**
-```js
-chapters.sort(function(a, b) {
-    var numA = a.name.match(/Chương\s*(\d+)/);
-    var numB = b.name.match(/Chương\s*(\d+)/);
-    var nA = numA ? parseInt(numA[1]) : 0;
-    var nB = numB ? parseInt(numB[1]) : 0;
-    return nA - nB;
-});
-```
+**Solution:** Use a numeric sort based on extracted chapter numbers if necessary.
 
 ---
 
-## Standardizing List Item Selection (nhatruyen)
+## 7. Standardizing List Item Selection
 
-**Problem:**
-Using generic selectors like `article` or `div` can lead to "1-item bug" where the AI selects the main container instead of repeating list items. Additionally, trying to call `el.name()` in Rhino/Jsoup triggers a `TypeError` as the JS wrapper doesn't expose it.
+**Problem:** 
+Using generic selectors like `article` or `div` can lead to the "1-item bug" where the main container is selected instead of individual list items.
 
 **Solution:**
-1. **Be Specific:** Always use class-based selectors for list items (e.g., `.nt-grid-item`, `.nt-story-item`) whenever possible.
-2. **Handle Link Elements Robustly:** Instead of `el.name()`, check if the element itself has a link using `el.attr('href')`.
+1. **Be Specific:** Always use list-item specific classes found via `mcp_vbook_inspect` (e.g., `.item`, `.story-card`).
+2. **Handle Link Elements Robustly:** Check if the container itself is an `<a>` or contains one.
    ```javascript
    var selfHref = el.attr('href') + "";
    var linkEl = (selfHref && selfHref.indexOf('http') > -1) ? el : el.select('a').first();
    ```
-3. **Selector Coverage:** Merge multiple potential item selectors to handle different views (grid vs list) on the same site.
-   `doc.select('.nt-grid-item, .nt-story-item, .item-manga')`
+3. **Selector Coverage:** If a site has multiple layouts (grid/list), merge the selectors:
+   `doc.select('SELECTOR_GRID_ITEM, SELECTOR_LIST_ITEM')`
+
+---
+
+## 8. Null Safety (Rhino Serialization)
+
+**Problem:** Calling `.text()`, `.attr()`, or `.html()` on Jsoup elements returns Java objects that may crash the serialization when passed to `Response.success`.
+
+**Rule:** **ALWAYS** append `+ ""` to convert them to JS strings.
+```javascript
+var title = el.select("SELECTOR").text() + "";
+```

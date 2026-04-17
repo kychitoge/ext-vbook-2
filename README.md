@@ -1,6 +1,6 @@
 # 📚 VBook Extensions Hub
 
-Chào mừng bạn đến với kho lưu trữ tiện ích mở rộng (extensions) dành cho ứng dụng **VBook Mobile**. Đây là trung tâm quản lý các plugin chất lượng cao cho Truyện chữ, Truyện tranh và các nguồn nội dung từ Trung Quốc/Quốc tế.
+Chào mừng bạn đến với kho lưu trữ tiện ích mở rộng (extensions) dành cho ứng dụng **VBook**. Đây là trung tâm quản lý các plugin cho Truyện chữ, Truyện tranh và các nguồn nội dung từ Trung Quốc/Quốc tế.
 
 Dự án này được xây dựng và quản lý bằng quy chuẩn chuyên nghiệp, đi kèm với các công cụ hỗ trợ phát triển tối ưu cho AI và lập trình viên.
 

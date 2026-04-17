@@ -337,7 +337,7 @@
             "name": "Tàng Thư Viện [APP]",
             "author": "B",
             "path": "https://raw.githubusercontent.com/dat-bi/ext-vbook/main/extensions/tangthuvienAPP/plugin.zip",
-            "version": 1,
+            "version": 2,
             "source": "https://m.tangthuvien.net",
             "icon": "https://raw.githubusercontent.com/dat-bi/ext-vbook/main/extensions/tangthuvienAPP/icon.png",
             "description": "Đọc truyện trên app Tàng Thư Viện",

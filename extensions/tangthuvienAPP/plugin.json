@@ -2,7 +2,7 @@
   "metadata": {
     "name": "Tàng Thư Viện [APP]",
     "author": "B",
-    "version": 1,
+    "version": 2,
     "source": "https://m.tangthuvien.net",
     "regexp": "https://apptangthuvien.*?",
     "description": "Đọc truyện trên app Tàng Thư Viện",
@@ -20,6 +20,12 @@
   },
   "config": {
     "thread_num": 1,
-    "delay": 3000
+    "delay": 3000,
+    "userId": {
+      "title": "User ID",
+      "mode": "input",
+      "format": "text",
+      "default": ""
+    }
   }
 }

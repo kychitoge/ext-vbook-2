@@ -14,7 +14,7 @@ function execute(url) {
 
     // Gợi ý: Nếu có nhiều server, có thể tách danh sách thành các khu vực bằng cấu trúc section:
     // chapters.push({ name: "Tên Server (Ví dụ: Server VIP)", type: "section" });
-
+   // Sau đó mới push các tập phim vào, giúp người dùng dễ chọn lựa hơn nếu có nhiều server hoặc nhiều loại tập phim (thuyết mình, phụ đề...)
     // TODO: Selector các thẻ <a> của từng tập phim
     // Thường là: "#list-episode a", ".server-episodes a", ".danh-sach a"
     doc.select("SELECTOR_EPISODE_LINKS").forEach(function(el) {

@@ -1,5 +1,5 @@
 // gen.js — Danh sách truyện từ 1 trang URL
-// Contract: execute(url, page) → [{ name*, link*, cover?, description?, host? }], nextPage?
+// Contract: execute(url, page) → [{name*, link*, cover?, description?, host?, tag?}], nextPage?
 // QUAN TRỌNG: nextPage phải là string, không phải số!
 function execute(url, page) {
     if (!page) page = "1";
@@ -45,7 +45,8 @@ function execute(url, page) {
             link:        link,
             cover:       cover,
             description: "",
-            host:        BASE_URL
+            host:        BASE_URL,
+            tag: e.select(".Demo").text()
         });
     });
 

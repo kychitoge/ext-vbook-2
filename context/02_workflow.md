@@ -38,35 +38,38 @@
 
 ---
 
-## Development Workflow
+## Creating a NEW Extension (8 Steps)
 
-### Creating a NEW Extension (8 Steps)
+### STEP 0 — ORCHESTRATED FLOW (RECOMMENDED) 🔴 MANDATORY
 
-#### STEP 0 — QUESTIONNAIRE 🔴 MANDATORY BEFORE EVERYTHING
+**AI MUST call `mcp_vbook_create_extension_flow(site_url)` as the very first action.**
 
-**AI MUST ask all 8 questions. Do NOT proceed to Step 1 until all answers are received.**
+This tool automatically:
+1.  **Checks Environment**: (VBOOK_IP connectivity).
+    -   If it returns `blocked_env`: **STOP**. Tell the user to update `.env`.
+2.  **Scaffolds Demo**: Creates a minimal extension directory.
+3.  **Requests Answers**: Returns `need_answers` status with the standardized questionnaire in Vietnamese:
 
+```text
+Để tạo extension, vui lòng cung cấp các thông tin sau:
+
+1. Loại truyện? (Novel / Comic / Chinese novel / Translate / TTS)
+2. Tag? (Normal / 18+)
+3. Link trang DANH SÁCH truyện (Trang chủ hoặc trang danh sách thể loại):
+4. Link trang CHI TIẾT một truyện (Bất kỳ truyện nào):
+5. Link trang MỤC LỤC chương (Nếu khác trang chi tiết):
+6. Link trang ĐỌC một CHƯƠNG cụ thể:
+7. Có tìm kiếm (Search) không? [Có / Không]
+8. Có danh mục thể loại (Genres) không? [Có / Không]
 ```
-To create the extension, please answer:
 
-1. Type?    [A] Novel  [B] Comic  [C] Chinese novel  [D] Translate  [E] TTS
-2. Tag?     [A] Normal  [B] 18+
-3. LISTING page URL (home/genre list):
-4. DETAIL page URL (any single book):
-5. TABLE OF CONTENTS page URL:
-6. CHAPTER READING page URL:
-7. Has search?  [A] Yes  [B] No
-8. Has genres?  [A] Yes  [B] No
-```
-
-> ℹ️ No need to ask about ToC pagination. `page.js` is always created by default.
-> If the ToC has no pagination → page.js simply returns `[url]`.
+**AI MUST wait for all answers before calling the flow again with the `answers` object.**
 
 ---
 
-#### STEP 1 — Inspect Website 🔴 DO NOT WRITE CODE BEFORE THIS STEP
+### STEP 1 — Inspect Website 🔴 DO NOT WRITE CODE BEFORE THIS STEP
 
-Inspect **ALL** URLs provided by the user before scaffolding:
+Once the flow reports `success`, inspect **ALL** URLs provided by the user using `mcp_vbook_analyze(url)` or `mcp_vbook_inspect(url)`:
 
 ```
 mcp_vbook_inspect(url_listing)  → selectors: list item, title, link, cover

@@ -12,7 +12,7 @@
  *     "mcpServers": {
  *       "vbook": {
  *         "command": "node",
- *         "args": ["d:/Github/ext-vbook-bi/vbook-tool/vbook-mcp-server.js"]
+ *         "args": ["d:/github/ext-vbookb/vbook-tool/vbook-mcp-server.js"]
  *       }
  *     }
  *   }
@@ -29,6 +29,8 @@ const execFileAsync = promisify(execFile);
 const CLI = path.join(__dirname, 'index.js');
 const PROJECT_ROOT = path.dirname(__dirname);
 const GITHUB_REPO = process.env.GITHUB_REPO || 'dat-bi/ext-vbook';
+
+const wizard = require('./lib/wizard');
 
 // ─── MCP stdio protocol helpers ───────────────────────────────────────────────
 
@@ -101,6 +103,52 @@ const TOOLS = [
                 minimal: { type: 'boolean', description: 'Only create required files (detail, page, toc, chap)' }
             },
             required: ['name', 'source', 'type']
+        }
+    },
+    {
+        name: 'create_smart',
+        description: 'AI-powered creation that attempts to auto-detect selectors. Requires URLs for all major pages.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                name: { type: 'string', description: 'Extension directory name' },
+                source: { type: 'string', description: 'Source website URL' },
+                type: { type: 'string', enum: ['novel', 'comic', 'chinese_novel', 'translate', 'tts'] },
+                locale: { type: 'string', default: 'vi_VN' },
+                tag: { type: 'string', enum: ['Normal', '18+'] },
+                url_home: { type: 'string' },
+                url_detail: { type: 'string' },
+                url_toc: { type: 'string' },
+                url_chap: { type: 'string' },
+                has_search: { type: 'boolean' },
+                has_genre: { type: 'boolean' }
+            },
+            required: ['name', 'source', 'type', 'url_detail', 'url_toc', 'url_chap']
+        }
+    },
+    {
+        name: 'create_extension_flow',
+        description: 'Orchestrated wizard to create a new extension. Handles environment checks and data gathering.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                site_url: { type: 'string', description: 'The base URL of the website' },
+                answers: {
+                    type: 'object',
+                    properties: {
+                        name: { type: 'string' },
+                        type: { type: 'string', enum: ['Novel', 'Comic', 'Chinese novel', 'Translate', 'TTS'] },
+                        tag: { type: 'string', enum: ['Normal', '18+'] },
+                        url_listing: { type: 'string' },
+                        url_detail: { type: 'string' },
+                        url_toc: { type: 'string' },
+                        url_chap: { type: 'string' },
+                        has_search: { type: 'boolean' },
+                        has_genre: { type: 'boolean' }
+                    }
+                }
+            },
+            required: ['site_url']
         }
     },
     {
@@ -365,7 +413,13 @@ function resolveExtPath(extension_path) {
 }
 
 function resolveExtDir(extension_name) {
-    return path.join(PROJECT_ROOT, 'extensions', extension_name);
+    const extensionsBase = path.join(PROJECT_ROOT, 'extensions');
+    const target = path.join(extensionsBase, extension_name);
+    // Path traversal check
+    if (!target.startsWith(extensionsBase)) {
+        throw new Error("Invalid extension name (path traversal detected)");
+    }
+    return target;
 }
 
 async function executeTool(name, args) {
@@ -429,6 +483,81 @@ async function executeTool(name, args) {
                 output: out.stdout,
                 error: out.stderr || null
             };
+        }
+
+        case 'create_extension_flow': {
+            const siteUrl = args.site_url.replace(/\/$/, '');
+            
+            // 1. Check Env First
+            const envCheck = await runCLI(['check-env', '--json']);
+            const envData = parseJsonOutput(envCheck.stdout);
+            if (!envData || envData.connected === false) {
+                return {
+                    status: "blocked_env",
+                    message: "❌ VBOOK_IP không hợp lệ hoặc không kết nối được. Hãy cập nhật .env rồi thử lại."
+                };
+            }
+
+            // 2. Check Answers
+            const mandatoryFields = ['name', 'type', 'tag', 'url_listing', 'url_detail', 'url_toc', 'url_chap', 'has_search', 'has_genre'];
+            const missingFields = [];
+            const answers = args.answers || {};
+            
+            mandatoryFields.forEach(f => {
+                if (answers[f] === undefined) missingFields.push(f);
+            });
+
+            if (missingFields.length > 0) {
+                // If we don't even have a name, try to slugify the siteUrl
+                const name = answers.name || siteUrl.replace(/https?:\/\//, '').replace(/\./g, '-');
+                
+                // Scaffold minimal demo if we have a name and environment is OK
+                if (!fs.existsSync(path.join(PROJECT_ROOT, 'extensions', name))) {
+                    await runCLI(['create', name, '--source', siteUrl, '--minimal'], PROJECT_ROOT);
+                }
+
+                return {
+                    status: "need_answers",
+                    missing_fields: missingFields,
+                    questions: [
+                        "Để tạo extension, vui lòng cung cấp các thông tin sau:",
+                        "",
+                        "1. Loại truyện? (Novel / Comic / Chinese novel / Translate / TTS)",
+                        "2. Tag? (Normal / 18+)",
+                        "3. Link trang DANH SÁCH truyện (Trang chủ hoặc trang danh sách thể loại):",
+                        "4. Link trang CHI TIẾT một truyện (Bất kỳ truyện nào):",
+                        "5. Link trang MỤC LỤC chương (Nếu khác trang chi tiết):",
+                        "6. Link trang ĐỌC một CHƯƠNG cụ thể:",
+                        "7. Có tìm kiếm (Search) không? [Có / Không]",
+                        "8. Có danh mục thể loại (Genres) không? [Có / Không]"
+                    ].join('\n')
+                };
+            }
+
+            // 3. All answers present -> Final Creation
+            const createResult = await executeTool('create_smart', {
+                name: answers.name,
+                source: siteUrl,
+                type: answers.type.toLowerCase().replace(' ', '_'),
+                tag: answers.tag,
+                url_home: answers.url_listing,
+                url_detail: answers.url_detail,
+                url_toc: answers.url_toc,
+                url_chap: answers.url_chap,
+                has_search: answers.has_search,
+                has_genre: answers.has_genre
+            });
+
+            if (createResult.success) {
+                wizard.clearState(siteUrl);
+                return {
+                    status: "success",
+                    message: `Extension '${answers.name}' created successfully!`,
+                    extension_path: createResult.extension_path
+                };
+            } else {
+                return { status: "error", message: createResult.error };
+            }
         }
 
         case 'validate': {
@@ -571,6 +700,10 @@ async function executeTool(name, args) {
             if (!fs.existsSync(filePath)) {
                 return { error: `File not found: ${filePath}` };
             }
+            // Path traversal check for script filename
+            if (!filePath.startsWith(extDir)) {
+                return { error: "Invalid script name (path traversal detected)" };
+            }
             const content = fs.readFileSync(filePath, 'utf8');
             return { extension: args.extension_name, script: args.script, content };
         }
@@ -582,6 +715,10 @@ async function executeTool(name, args) {
                 return { error: `Extension not found: ${args.extension_name}` };
             }
             const filePath = path.join(srcDir, args.script);
+            // Path traversal check for script filename
+            if (!filePath.startsWith(srcDir)) {
+                return { error: "Invalid script name (path traversal detected)" };
+            }
             fs.writeFileSync(filePath, args.content, 'utf8');
             return { success: true, path: filePath, bytes: Buffer.byteLength(args.content) };
         }
@@ -608,7 +745,6 @@ async function executeTool(name, args) {
                     return path.join(PROJECT_ROOT, 'extensions', extDirs[0] || '');
                 })();
 
-            const encoding = args.use_gbk ? '"gbk"' : '';
             const htmlCall = args.use_gbk ? 'res.html("gbk")' : 'res.html()';
 
             // Build selector tests

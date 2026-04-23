@@ -97,3 +97,14 @@ Using generic selectors like `article` or `div` can lead to the "1-item bug" whe
 ```javascript
 var title = el.select("SELECTOR").text() + "";
 ```
+
+---
+
+## 9. Standardized Creation Workflow (Gatekeeper)
+
+**Problem:** AI skipping environment checks or guessing website details before verifying the connection and asking for necessary information.
+
+**Solution:** 
+1. **Check IP First**: Call `mcp_vbook_check_env` immediately. If it fails, report "DEVICE UNREACHABLE" and stop.
+2. **Scaffold & Question**: Once environment is verified, call `mcp_vbook_create` (minimal) or `mcp_vbook_copy_demo` to initialize the project, then ask the 8 standardized questions about the website structure.
+3. **No Guessing**: Wait for user answers and real device data from `mcp_vbook_inspect` before writing any implementation code.

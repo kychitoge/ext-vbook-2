@@ -11,57 +11,34 @@ Follow their rules exactly, especially the Rhino runtime constraints.
 
 ### 🤖 AUTONOMOUS AGENT WORKFLOW — TẠO EXTENSION MỚI
 
-**CRITICAL ORDER — KHÔNG được đảo thứ tự:**
+**CRITICAL ORDER — PHẢI thực hiện theo thứ tự này:**
 
-#### BƯỚC 0 — HỎI USER (bắt buộc, chưa có thì DỪNG)
-Cần các link sau trước khi làm bất cứ điều gì:
-- Loại? (novel / comic / chinese_novel)
-- Tag? (thường / nsfw)
-- Link trang DANH SÁCH truyện (home/gen)
-- Link trang CHI TIẾT một truyện
-- Link trang MỤC LỤC chương
-- Link trang ĐỌC một CHƯƠNG
-- Có search? Có genres?
+#### BƯỚC 0 — ORCHESTRATED FLOW (BẮT BUỘC)
+Ngay khi user yêu cầu tạo extension cho 1 URL, AI phải gọi TRỰC TIẾP:
+`mcp_vbook_create_extension_flow(site_url: "...")`
 
-#### BƯỚC 1 — DÙNG `mcp_vbook_create_smart` (PREFERRED — cho mọi model AI)
-Nếu user đã cung cấp đủ 4 URLs → gọi TRỰC TIẾP, không làm gì thêm:
-```
-mcp_vbook_create_smart(
-  name, source, type,
-  url_home, url_detail, url_toc, url_chap,
-  has_search, has_genre
-)
-```
-Tool tự inspect website trên device → score selectors → generate code với real selectors.
-**KHÔNG inspect riêng. KHÔNG create riêng. KHÔNG viết code thủ công.**
+Tool này sẽ tự động:
+1.  **Check Env**: Nếu fail sẽ trả về `blocked_env`. AI phải thông báo user kiểm tra IP.
+2.  **Scaffold Demo**: Tự tạo thư mục extension minimal.
+3.  **Hỏi User**: Trả về `need_answers` và danh sách câu hỏi chuẩn.
 
-#### BƯỚC 1 (fallback) — Nếu `create_smart` lỗi hoặc url_toc = url_detail
-Inspect thủ công từng URL rồi dùng `mcp_vbook_create`:
-```
-inspect(url_danh_sach)   → selectors: list item, title, link, cover
-inspect(url_chi_tiet)    → selectors: name, author, cover, status, description, genres, chapters
-inspect(url_doc_chuong)  → selectors: chapter content
-```
-Viết code với REAL selectors từ kết quả inspect. **NGHIÊM CẤM dùng generic placeholders.**
+**AI PHẢI CHỜ** user trả lời đầy đủ trước khi gọi lại tool này với tham số `answers`.
 
-#### BƯỚC 3 — IMPLEMENT với SELECTORS THỰC TẾ
-Dùng kết quả từ Bước 1 để viết code. **NGHIÊM CẤM dùng generic placeholder selectors** như:
-- ❌ `.book-item, .story-item, .list-item`
-- ❌ `h3 a, .title a`
-- ❌ `#chapter-content, .chapter-c, #content, .chapter-content`
+#### BƯỚC 1 — INSPECT WEBSITE
+Sau khi flow trả về `success`, AI dùng `mcp_vbook_analyze` hoặc `mcp_vbook_inspect` cho TỪNG URL trong câu trả lời của user:
+- Inspect `url_listing`, `url_detail`, `url_toc`, `url_chap`.
+- Lấy selectors thực tế từ device. **NGHIÊM CẤM ĐOÁN SELECTOR.**
 
-Phải dùng selector thực tế lấy từ kết quả inspect.
+#### BƯỚC 3 — IMPLEMENT & TEST
+1. Viết code vào `src/*.js` dựa trên selectors thực tế. Tuân thủ Rhino ES6 (Không `async`, không `?.`).
+2. `vbook validate`
+3. `vbook debug src/detail.js -in "<url>"`
+4. `vbook test-all`
+5. `vbook publish` (Chỉ khi test pass 100%)
 
-#### BƯỚC 4–7 — VALIDATE → DEBUG → TEST-ALL → CLEANUP → PUBLISH
-```bash
-vbook validate
-vbook debug src/detail.js -in "<url>"
-vbook test-all
-```
-**BƯỚC DỌN DẸP BẮT BUỘC:** Trước khi publish, AI PHẢI XÓA toàn bộ các file rác sinh ra trong quá trình test (`temp.html`, `*debug.txt`, `*debug.json`, v.v.). KHÔNG được để lại các file này trong codebase.
-```bash
-vbook publish
-```
+#### BƯỚC 4 — DỌN DẸP & HOÀN TẤT
+Trước khi publish, AI PHẢI XÓA toàn bộ các file rác sinh ra trong quá trình test (`temp.html`, `*debug.txt`, `*debug.json`, v.v.). KHÔNG được để lại các file này trong codebase.
+Sau đó thông báo phiên bản mới cho user.
 
 ---
 

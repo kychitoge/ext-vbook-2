@@ -365,6 +365,18 @@ const TOOLS = [
             },
             required: ['name', 'type']
         }
+    },
+    {
+        name: 'get_dom_tree',
+        description: 'Extract a simplified DOM tree (JSON) from a URL using the VBook device. Highly useful for AI to find selectors automatically.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                url: { type: 'string', description: 'URL to extract DOM from' },
+                extension_dir: { type: 'string', description: 'Context extension directory (e.g. extensions/ntruyen)' }
+            },
+            required: ['url', 'extension_dir']
+        }
     }
 ];
 
@@ -821,6 +833,29 @@ ${selectorCode}
             }
 
             return inspectResult;
+        }
+        
+        case 'get_dom_tree': {
+            const cwd = resolveExtPath(args.extension_dir);
+            const scriptPath = path.join(PROJECT_ROOT, 'vbook-tool', 'scripts', 'dom-tree.js');
+            const tmpFile = path.join(cwd, 'src', '_dom_tree_tmp.js');
+            
+            // Ensure src directory exists
+            if (!fs.existsSync(path.join(cwd, 'src'))) {
+                fs.mkdirSync(path.join(cwd, 'src'), { recursive: true });
+            }
+
+            fs.copyFileSync(scriptPath, tmpFile);
+            
+            let treeResult;
+            try {
+                const out = await runCLI(['debug', tmpFile, '-in', args.url, '--json'], cwd);
+                const parsed = parseJsonOutput(out.stdout);
+                treeResult = parsed || { success: false, error: out.stderr || out.stdout };
+            } finally {
+                try { fs.unlinkSync(tmpFile); } catch (_) {}
+            }
+            return treeResult;
         }
 
         case 'read_context': {

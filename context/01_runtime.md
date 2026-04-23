@@ -89,7 +89,7 @@ b.html() / b.urls() / b.close()  // always close!
 
 ### Utilities
 ```js
-Console.log(v)
+console.log(v)
 sleep(ms)
 load("file.js")
 Html.clean(str, ["div","p"])

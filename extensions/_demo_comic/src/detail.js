@@ -31,8 +31,8 @@ function execute(url) {
     var statusEl = doc.select("SELECTOR_STATUS").first();
     var status = (statusEl ? statusEl.text() : "") + "";
     var ongoing = status.indexOf("Hoàn") === -1
-               && status.indexOf("Completed") === -1
-               && status.indexOf("Full") === -1;
+        && status.indexOf("Completed") === -1
+        && status.indexOf("Full") === -1;
 
     // TODO: Selector container mô tả / tóm tắt
     var descEl = doc.select("SELECTOR_DESCRIPTION").first();
@@ -40,9 +40,9 @@ function execute(url) {
 
     // TODO: Selector các link thể loại
     var genres = [];
-    doc.select("SELECTOR_GENRE_LINKS").forEach(function(el) {
+    doc.select("SELECTOR_GENRE_LINKS").forEach(function (el) {
         var gTitle = el.text() + "";
-        var gHref  = (el.attr("href") || "") + "";
+        var gHref = (el.attr("href") || "") + "";
         if (!gTitle || !gHref) return;
         if (!gHref.startsWith("http")) gHref = BASE_URL + gHref;
         genres.push({ title: gTitle, input: gHref, script: "gen.js" });
@@ -52,15 +52,17 @@ function execute(url) {
     if (author) {
         suggests.push({ title: "Cùng tác giả: " + author, input: author, script: "search.js" });
     }
-
+    //Bình luận — chỉ thêm nếu site có comment (Q9=Có)
+    // var comments = [{ title: "Bình luận", input: API_URL + "?page={{page}}", script: "comment.js" }];
     return Response.success({
-        name:        name,
-        cover:       cover,
-        host:        BASE_URL,
-        author:      author,
+        name: name,
+        cover: cover,
+        host: BASE_URL,
+        author: author,
         description: description,
-        ongoing:     ongoing,
-        genres:      genres.length > 0 ? genres : undefined,
-        suggests:    suggests.length > 0 ? suggests : undefined
+        ongoing: ongoing,
+        genres: genres.length > 0 ? genres : undefined,
+        suggests: suggests.length > 0 ? suggests : undefined
+        // comments: comments  // bỏ comment dòng này nếu có comment.js
     });
 }

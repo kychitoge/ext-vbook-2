@@ -1,4 +1,5 @@
 load("config.js");
+load("crypto.js");
 function execute(url) {
     sleep(Math.random() * (2500- 1000) + 1000);
     const secret = "174587236491eyoruwoiernzwueyquhszsadhajsdha8";
@@ -18,7 +19,7 @@ console.log("dd");
         id_chapter: chapterId,
         id_story: storyId,
         user_id: userId,
-        hash: sha256(token + chapterId + storyId + userId + secret)
+        hash: CryptoJS.SHA256(token + chapterId + storyId + userId + secret).toString()
     };
 
     let response = fetch(API_BASE + "/ttv/ttv_apiv2/public/get_content_chapter", {

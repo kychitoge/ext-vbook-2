@@ -48,7 +48,6 @@
 
 ## API Reference
 
-<<<<<<< HEAD
 ### Response API
 
 ```js
@@ -59,27 +58,22 @@ Response.error(message); // → {code: 1, data: message}
 
 ### Fetch API
 
-=======
-### Return API
 ```js
-Response.success(data)        // single value
-Response.success(data, next)  // data + next (MUST be string)
-Response.error("message")
+fetch(url)                                    // GET request
+fetch(url, options)                           // Custom request
+
+// Options object structure:
+{
+  method: "GET|POST",
+  headers: {key: value},
+  body: "string|Blob",
+  timeout: ms,
+  queries: {param: value}
+}
+
+// Returns HttpResponse object
 ```
 
-### HTTP API
->>>>>>> parent of cf5a5c1 (update)
-```js
-fetch(url)
-fetch(url, {method:"POST", headers:{}, body:""})
-res.ok / res.status
-res.headers["set-cookie"]
-res.html() / res.html("gbk") / res.text() / res.json() / res.base64()
-Http.get(url).headers({}).queries({}).html()
-Http.post(url).headers({}).body("").string()
-```
-
-<<<<<<< HEAD
 ### HttpResponse API (from fetch)
 
 ```js
@@ -171,21 +165,11 @@ elements.remove(); // remove all elements
 // Iteration
 elements.forEach(function (el) {}); // el is HtmlElement
 elements.map(function (el) {}); // → array
-=======
-### DOM API (jsoup)
-```js
-Html.parse(str) → doc
-doc.select("css")
-el.text() / el.html() / el.attr("name") / el.outerHtml()
-el.first() / el.last() / el.get(i) / el.size() / el.length
-elements.forEach(fn) / elements.map(fn)
->>>>>>> parent of cf5a5c1 (update)
 ```
 
 ### Browser API
 
 ```js
-<<<<<<< HEAD
 var browser = Engine.newBrowser();
 
 // User Agent
@@ -336,30 +320,6 @@ load(filePath); // Load and execute external script file
 Html.clean(htmlString, tagArray); // Clean HTML by removing specified tags
 // Example: Html.clean("<p>text</p><div>content</div>", ["div"])
 // → "<p>text</p>"
-=======
-var b = Engine.newBrowser();
-b.setUserAgent(UserAgent.android|chrome|ios|system)
-b.launch(url, timeoutMs)    // sync
-b.launchAsync(url); sleep(2500);
-b.callJs(script, waitMs)
-b.waitUrl([patterns], ms)
-b.block([patterns])
-b.getVariable("name")
-b.html() / b.urls() / b.close()  // always close!
-```
-
-### Utilities
-```js
-console.log(v)
-sleep(ms)
-load("file.js")
-Html.clean(str, ["div","p"])
-localCookie.setCookie("k=v") / localCookie.getCookie()
-localStorage.getItem/setItem
-Script.execute(code, funcName, param)
-Graphics.createCanvas(w,h) / Graphics.createImage(base64)
-WebSocket(url, options)
->>>>>>> parent of cf5a5c1 (update)
 ```
 
 ---

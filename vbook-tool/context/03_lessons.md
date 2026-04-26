@@ -117,11 +117,3 @@ var title = el.select("SELECTOR").text() + "";
 **Problem:** Using `Engine.newBrowser()` (Web View) is resource-intensive and slow compared to simple HTTP requests. It introduces delays (like waiting for DOM hydration) and increases the risk of connection timeouts.
 
 **Solution:** Always prioritize using `fetch(url)` or `Http.get(url)` for data extraction. Only fall back to `Engine.newBrowser()` if the site relies heavily on client-side rendering (SPA like React/SvelteKit), has strict anti-bot protections (like Cloudflare Turnstile), or uses complex JavaScript logic to assemble the content that cannot be easily replicated via API calls or static parsing.
-
----
-
-## SvelteKit Svelte-devalue Parsing
-
-**Problem:** Using `JSON.parse` to parse the `__SVELTEKIT_DATA__` (or Svelte's `devalue` string) fails because the string contains unquoted keys (like `{type:"data"}`) and valid JavaScript expressions (like `void 0` or `new Date()`) which are not valid JSON.
-
-**Solution:** Use `eval("var dataArr = " + rawData + ";")` instead of `JSON.parse` to evaluate the Svelte state object correctly natively via Rhino. `eval` is completely capable of reading `devalue` outputs.

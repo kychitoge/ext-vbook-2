@@ -37,16 +37,11 @@ Chúng tôi sử dụng quy trình phát triển hỗ trợ bởi AI để đả
    ```bash
    cd vbook-tool
    npm install
-   # (Tùy chọn) npm link  # nếu bạn muốn dùng lệnh `vbook` global
+   npm link
    ```
 
 2. **Cấu hình**:
    Copy `.env.example` (hoặc tạo file `.env`) trong thư mục `vbook-tool/` và thiết lập `VBOOK_IP` theo địa chỉ IP hiển thị tại tab "Web Server" trên ứng dụng VBook.
-
-3. **Chạy CLI ổn định trên mọi máy (không cần PATH / npm link)**:
-   - Windows (PowerShell): `.\vbook-tool\vbook.ps1 <command>`
-   - Windows (CMD): `.\vbook-tool\vbook.cmd <command>`
-   - macOS/Linux: `./vbook-tool/vbook <command>`
 
 3. **Tìm hiểu quy trình**:
    Vui lòng đọc kỹ [Quy trình làm việc tiêu chuẩn](file:///d:/github/ext-vbookb/context/02_workflow.md) và [Các ràng buộc Rhino Runtime](file:///d:/github/ext-vbookb/context/01_runtime.md) trước khi đóng góp.

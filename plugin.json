@@ -167,18 +167,6 @@
             "tag": "nsfw"
         },
         {
-            "name": "hentaizhot",
-            "author": "B",
-            "path": "https://raw.githubusercontent.com/dat-bi/ext-vbook/main/extensions/hentaizhot/plugin.zip",
-            "version": 4,
-            "source": "https://hentaiz.hot",
-            "icon": "https://raw.githubusercontent.com/dat-bi/ext-vbook/main/extensions/hentaizhot/icon.png",
-            "description": "HentaiZ video extension",
-            "type": "video",
-            "locale": "vi_VN",
-            "tag": "18+"
-        },
-        {
             "name": "HHTQ Vietsub",
             "author": "vBook",
             "path": "https://raw.githubusercontent.com/dat-bi/ext-vbook/main/extensions/HHTQ/plugin.zip",

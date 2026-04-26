@@ -10,7 +10,7 @@ Bộ công cụ CLI chuyên nghiệp để phát triển, kiểm thử và phát
 ```bash
 cd vbook-tool
 npm install
-# (Tùy chọn) npm link     # Nếu bạn muốn dùng lệnh `vbook` global
+npm link     # Để có thể sử dụng lệnh `vbook` ở bất cứ đâu
 ```
 
 ### 2. Cấu hình nhanh (.env)
@@ -21,11 +21,6 @@ VBOOK_IP=192.168.1.XX       # Lấy từ tab "Web Server" trong app VBook
 VBOOK_PORT=8080             # Mặc định là 8080
 GITHUB_REPO=user/repo       # Repo GitHub để gen link tải plugin.zip
 ```
-
-### 3. Chạy CLI ổn định (không cần PATH / npm link)
-- Windows (PowerShell): `.\vbook.ps1 <command>`
-- Windows (CMD): `.\vbook.cmd <command>`
-- macOS/Linux: `./vbook <command>`
 
 ---
 

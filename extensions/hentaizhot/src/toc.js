@@ -1,37 +1,12 @@
 load("config.js");
 
 function execute(url) {
-    url = url.replace(/^(?:https?:\/\/)?(?:[^@\n]+@)?(?:www\.)?([^:\/\n?]+)/img, BASE_URL);
-    var slug = url.split('/').pop();
+    url = url.replace(/^(?:https?:\/\/)?(?:www\.)?([^\/]+)/, BASE_URL);
+    if (url.slice(-1) === "/") url = url.slice(0, -1);
 
-    var cached = cacheStorage.getItem("cached_toc_" + slug);
-    if (cached) {
-        var table = [];
-        try { eval("table = " + cached + ";"); } catch(e) {}
-        var resArr = parseSvelteTable(table);
-        if (resArr && resArr.length > 0) return Response.success(resArr);
-    }
-    return Response.error("Không tìm thấy mục lục");
-}
-
-function parseSvelteTable(table) {
-    var data = table;
-    var indices = table[1]; 
-    if (!indices || !Array.isArray(indices)) return [];
-
-    function resolve(idx) { return (typeof idx === 'number') ? data[idx] : idx; }
-
-    var chapters = [];
-    for (var i = 0; i < indices.length; i++) {
-        var item = resolve(indices[i]);
-        if (item && item.slug) {
-            var slug = resolve(item.slug);
-            chapters.push({
-                name: "Tập " + (i + 1),
-                url: BASE_URL + "/watch/" + slug,
-                host: BASE_URL
-            });
-        }
-    }
-    return chapters;
+    // For video sites, usually there is only 1 "chapter" per detail page
+    // Unless it's a series, but for hentaiz, each item in browse is an episode.
+    return Response.success([
+        { name: "Xem phim", url: url, host: BASE_URL }
+    ]);
 }

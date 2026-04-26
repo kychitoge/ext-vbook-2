@@ -7,14 +7,14 @@ function execute(url, page) {
     } else {
         page = `page/${page}/`
     };
-    let newUrl =  url + page
+    let newUrl = url + page
     console.log(newUrl)
     let response = fetch(newUrl);
     if (response.ok) {
         let doc = response.html();
         let data = [];
         doc.select(".post").forEach(e => {
-            let name = e.select('.entry-title').text();
+            let name = e.select('.entry-title').text().split('–')[0].trim();
             data.push({
                 name: name,
                 link: e.select('h2 a').attr('href'),

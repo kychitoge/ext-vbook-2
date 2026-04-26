@@ -96,18 +96,6 @@
             "tag": "nsfw"
         },
         {
-            "name": "Buondua",
-            "author": "hieu05",
-            "path": "https://raw.githubusercontent.com/dat-bi/ext-vbook/main/extensions/Buondua/plugin.zip",
-            "version": 2,
-            "source": "https://buondua.com/",
-            "icon": "https://raw.githubusercontent.com/dat-bi/ext-vbook/main/extensions/Buondua/icon.png",
-            "description": "Tập Hợp Album của Xiuren...",
-            "type": "comic",
-            "locale": "vi_VN",
-            "tag": "nsfw"
-        },
-        {
             "name": "daomeoden",
             "author": "B",
             "path": "https://raw.githubusercontent.com/dat-bi/ext-vbook/main/extensions/daomeoden/plugin.zip",
@@ -134,7 +122,7 @@
             "name": "Đọc Truyện 14",
             "author": "B",
             "path": "https://raw.githubusercontent.com/dat-bi/ext-vbook/main/extensions/doctruyen14/plugin.zip",
-            "version": 5,
+            "version": 6,
             "source": "https://doctruyen14.biz/",
             "icon": "https://raw.githubusercontent.com/dat-bi/ext-vbook/main/extensions/doctruyen14/icon.png",
             "description": "Đọc Truyện 14 là trang web đọc truyện chữ online.",

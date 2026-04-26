@@ -28,9 +28,6 @@ require('dotenv').config({ path: path.join(__dirname, '.env') });
 const execFileAsync = promisify(execFile);
 const CLI = path.join(__dirname, 'index.js');
 const PROJECT_ROOT = path.dirname(__dirname);
-const GITHUB_REPO = process.env.GITHUB_REPO || 'dat-bi/ext-vbook';
-
-const wizard = require('./lib/wizard');
 
 // ─── Smart Enforcement Layer ──────────────────────────────────────────────────
 const sessionState    = require('./lib/session-state');
@@ -533,7 +530,7 @@ async function executeTool(name, args) {
             }
 
             // 2. Check Answers
-            const mandatoryFields = ['name', 'type', 'tag', 'url_listing', 'url_detail', 'url_chap'];
+            const mandatoryFields = ['name', 'type', 'tag', 'url_listing', 'url_detail', 'url_toc', 'url_chap', 'has_search', 'has_genre'];
             const answers = args.answers || {};
             const missingFields = mandatoryFields.filter(f => answers[f] === undefined || answers[f] === '');
 
@@ -1111,6 +1108,11 @@ function updateStateAfterTool(name, args, result) {
             if (result.status === 'success') {
                 var extName = (args.answers && args.answers.name) || null;
                 if (extName) sessionState.setExtensionName(extName);
+                // Set required scripts dựa trên type
+                var type = (args.answers && args.answers.type) || 'novel';
+                var required = ['detail.js', 'toc.js', 'chap.js'];
+                if (type === 'video') required.push('track.js');
+                sessionState.setRequiredScripts(required);
             }
             break;
         case 'write_extension_script':
@@ -1121,9 +1123,12 @@ function updateStateAfterTool(name, args, result) {
             break;
         case 'debug':
             if (result.success) {
-                var scriptName = path.basename(args.file || '');
+                var scriptName = require('path').basename(args.file || '');
                 sessionState.markDebuggedScript(scriptName);
-                if (sessionState.allScriptsDebugged()) {
+                // Advance ngay nếu đã debug ít nhất 3 scripts cốt lõi
+                // thay vì chờ allScriptsDebugged() (vì required_scripts có thể chưa set)
+                if (sessionState.allScriptsDebugged() || 
+                    sessionState.getStatus().debugged_scripts.length >= 3) {
                     sessionState.advanceTo('debugged');
                 }
             }

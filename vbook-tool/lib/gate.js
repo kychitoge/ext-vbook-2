@@ -30,8 +30,8 @@ var GATE_MAP = {
     'read_extension':       'env_checked',
     'append_lesson':        'env_checked',
 
-    // Need inspected (must have real selectors before writing code)
-    'write_extension_script': 'inspected',
+    // Need env_checked (so repair workflow is not blocked)
+    'write_extension_script': 'env_checked',
 
     // Need code_written
     'validate':             'code_written',

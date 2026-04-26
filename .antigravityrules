@@ -1,56 +1,31 @@
-When asked to create, modify, test or debug a VBook extension, you MUST first read context documents in this order:
+# VBOOK AI AGENT — MANDATORY PROTOCOL
 
-1. `context/01_runtime.md` — Rhino ES6 constraints and API reference
-2. `context/02_workflow.md` — Development SOP
-3. `context/03_lessons.md` — Common mistakes
-4. `context/04_demo.md` — Code examples and script data flow
+## BẮT ĐẦU MỌI SESSION (không có ngoại lệ)
+1. Gọi `get_session_state` — xem đang ở bước nào
+2. Nếu step = 'init' → gọi `check_env` ngay lập tức
+3. Nếu `check_env` fail → BÁO USER CẬP NHẬT IP, DỪNG HOÀN TOÀN
 
-Follow their rules exactly, especially the Rhino runtime constraints.
+## KHI BỊ BLOCK
+- Đọc `reason` và `hint` trong response
+- Làm đúng theo hint
+- KHÔNG tìm cách bypass gate
+- KHÔNG "thử cách khác"
 
----
+## KHI BỊ REJECT (write_extension_script)
+- Đọc `rhino_violations` và `placeholder_violations`
+- Fix TẤT CẢ trước khi gọi lại
+- KHÔNG bỏ qua bất kỳ violation nào
 
-### 🤖 AUTONOMOUS AGENT WORKFLOW — TẠO EXTENSION MỚI
+## QUY TẮC TUYỆT ĐỐI
+- KHÔNG viết code trước khi có kết quả inspect thực tế
+- KHÔNG dùng placeholder — tool sẽ reject tự động
+- KHÔNG dùng async/await/?./?? — tool sẽ reject tự động
+- KHÔNG skip bước — gate sẽ block tự động
 
-**CRITICAL ORDER — PHẢI thực hiện theo thứ tự này:**
+## RUNTIME REFERENCE
+- API Rhino: đọc context/01_runtime.md
+- Workflow: đọc context/02_workflow.md
+- Code mẫu: đọc context/04_demo.md
 
-#### BƯỚC 0 — ORCHESTRATED FLOW (BẮT BUỘC)
-Ngay khi user yêu cầu tạo extension cho 1 URL, AI phải gọi TRỰC TIẾP:
-`mcp_vbook_create_extension_flow(site_url: "...")`
-
-Tool này sẽ tự động:
-1.  **Check Env**: Nếu fail sẽ trả về `blocked_env`. AI phải thông báo user kiểm tra IP.
-2.  **Scaffold Demo**: Tự tạo thư mục extension minimal.
-3.  **Hỏi User**: Trả về `need_answers` và danh sách câu hỏi chuẩn.
-
-**AI PHẢI CHỜ** user trả lời đầy đủ trước khi gọi lại tool này với tham số `answers`.
-
-#### BƯỚC 1 — INSPECT WEBSITE
-Sau khi flow trả về `success`, AI dùng `mcp_vbook_analyze` hoặc `mcp_vbook_inspect` cho TỪNG URL trong câu trả lời của user:
-- Inspect `url_listing`, `url_detail`, `url_toc`, `url_chap`.
-- Lấy selectors thực tế từ device. **NGHIÊM CẤM ĐOÁN SELECTOR.**
-
-#### BƯỚC 3 — IMPLEMENT & TEST
-1. Viết code vào `src/*.js` dựa trên selectors thực tế. Tuân thủ Rhino ES6 (Không `async`, không `?.`).
-2. `vbook validate`
-3. `vbook debug src/detail.js -in "<url>"`
-4. `vbook test-all`
-5. `vbook publish` (Chỉ khi test pass 100%)
-
-#### BƯỚC 4 — DỌN DẸP & HOÀN TẤT
-Trước khi publish, AI PHẢI XÓA toàn bộ các file rác sinh ra trong quá trình test (`temp.html`, `*debug.txt`, `*debug.json`, v.v.). KHÔNG được để lại các file này trong codebase.
-Sau đó thông báo phiên bản mới cho user.
-
----
-
-### 🔧 REPAIR EXTENSION
-1. Đọc code hiện tại (`read_extension`)
-2. Inspect URL thực tế xem có gì thay đổi
-3. Fix với selector thực tế
-4. `vbook validate` → `vbook debug` → `vbook publish`
-
----
-
-**CLI Fallback:** `node d:/Github/ext-vbook-bi/vbook-tool/index.js`
-**Output:** Luôn dùng `--json` flag.
-**Record Lesson:** Sau khi fix, gọi `append_lesson` MCP tool.
-Goal: 100% completed, published extension.
+## MỌI THỨ KHÁC do MCP server tự enforce.
+AI chỉ cần đọc `_next` trong mỗi response để biết bước tiếp theo.

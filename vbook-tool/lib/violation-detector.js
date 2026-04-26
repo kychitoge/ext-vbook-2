@@ -107,28 +107,43 @@ var GENERIC_SELECTORS = [
  */
 function detectPlaceholders(code) {
     var violations = [];
+    var lines = code.split('\n');
 
-    for (var i = 0; i < PLACEHOLDER_LIST.length; i++) {
-        if (code.indexOf(PLACEHOLDER_LIST[i]) >= 0) {
-            violations.push({
-                placeholder: PLACEHOLDER_LIST[i],
-                message: 'Template placeholder chưa được thay thế: ' + PLACEHOLDER_LIST[i]
-            });
-        }
-    }
+    PLACEHOLDER_LIST.forEach(function(p) {
+        lines.forEach(function(line) {
+            var trimmed = line.trim();
+            // Bỏ qua comment
+            if (trimmed.indexOf('//') === 0) return;
+            if (trimmed.indexOf('*') === 0) return;
+            if (trimmed.indexOf('/*') === 0) return;
+            
+            if (line.indexOf(p) >= 0) {
+                violations.push({
+                    placeholder: p,
+                    message: 'Template placeholder chưa được thay thế: ' + p
+                });
+            }
+        });
+    });
 
-    for (var j = 0; j < GENERIC_SELECTORS.length; j++) {
-        // Only flag if used as a string literal in select()
-        var sel = GENERIC_SELECTORS[j];
-        var pattern1 = 'select("' + sel + '")';
-        var pattern2 = "select('" + sel + "')";
-        if (code.indexOf(pattern1) >= 0 || code.indexOf(pattern2) >= 0) {
-            violations.push({
-                placeholder: sel,
-                message: 'Generic selector không đáng tin — phải inspect để lấy selector thực tế: ' + sel
-            });
-        }
-    }
+    GENERIC_SELECTORS.forEach(function(sel) {
+        lines.forEach(function(line) {
+            var trimmed = line.trim();
+            // Bỏ qua comment
+            if (trimmed.indexOf('//') === 0) return;
+            if (trimmed.indexOf('*') === 0) return;
+            if (trimmed.indexOf('/*') === 0) return;
+
+            var pattern1 = 'select("' + sel + '")';
+            var pattern2 = "select('" + sel + "')";
+            if (line.indexOf(pattern1) >= 0 || line.indexOf(pattern2) >= 0) {
+                violations.push({
+                    placeholder: sel,
+                    message: 'Generic selector không đáng tin — phải inspect để lấy selector thực tế: ' + sel
+                });
+            }
+        });
+    });
 
     return violations;
 }

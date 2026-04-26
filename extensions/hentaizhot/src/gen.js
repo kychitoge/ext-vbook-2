@@ -53,7 +53,7 @@ function execute(url, page) {
             var n = root.nodes[i];
             if (n && n.type === "data" && Array.isArray(n.data)) {
                 payload = resolveValue(n.data[0], n.data, {});
-                if (payload && (payload.episodes || payload.genres || payload.items)) break;
+                if (payload && (payload.episodes || payload.genres || payload.items || payload.genre)) break;
             }
         }
 
@@ -74,14 +74,12 @@ function execute(url, page) {
             if (!slug) return;
 
             // Extract episode count for tags
-            // Method 1: from slug like "xxx-1", "xxx-2"
             let tags = "";
             var epCount = 0;
             var slugMatch = slug.match(/-(\d+)$/);
             if (slugMatch) {
                 epCount = parseInt(slugMatch[1]) || 0;
             }
-            // Method 2: from episodeNumber field (may be null after resolve)
             if (epCount === 0) {
                 epCount = item.episodeNumber || 0;
             }
@@ -91,13 +89,14 @@ function execute(url, page) {
 
             var name = ((item.title || item.name || slug) + "").trim();
 
-            // Image logic: posterImage (new), thumbnailImage (old), or genre fallback
+            // Image logic: posterImage > backdropImage > thumbnailImage
             var cover = "";
-            var imgObj = item.posterImage || item.thumbnailImage;
+            var imgObj = item.posterImage || item.backdropImage || item.thumbnailImage;
             if (imgObj && imgObj.filePath) {
                 cover = imgObj.filePath + "";
-            } else if (payload.genre && payload.genre.thumbnailImage && payload.genre.thumbnailImage.filePath) {
-                cover = payload.genre.thumbnailImage.filePath + "";
+            } else if (payload.genre) {
+                var gImg = payload.genre.posterImage || payload.genre.backdropImage || payload.genre.thumbnailImage;
+                if (gImg && gImg.filePath) cover = gImg.filePath + "";
             }
 
             if (cover && cover.indexOf("http") !== 0) {

@@ -125,3 +125,11 @@ var title = el.select("SELECTOR").text() + "";
 **Problem:** Using `JSON.parse` to parse the `__SVELTEKIT_DATA__` (or Svelte's `devalue` string) fails because the string contains unquoted keys (like `{type:"data"}`) and valid JavaScript expressions (like `void 0` or `new Date()`) which are not valid JSON.
 
 **Solution:** Use `eval("var dataArr = " + rawData + ";")` instead of `JSON.parse` to evaluate the Svelte state object correctly natively via Rhino. `eval` is completely capable of reading `devalue` outputs.
+
+---
+
+## HentaizHot Cover Image Fix
+
+**Problem:** Cover images in the listing (`gen.js`) and detail (`detail.js`) were often falling back to the genre-wide thumbnail because `posterImage` was null, even though `backdropImage` contained the correct unique image for the episode.
+
+**Solution:** Updated the image selection priority to `item.posterImage || item.backdropImage || item.thumbnailImage`. This ensures that if the preferred `posterImage` is missing, the script attempts to use the `backdropImage` before falling back to the generic genre thumbnail. This pattern should be applied to all SvelteKit-based extensions for this site.

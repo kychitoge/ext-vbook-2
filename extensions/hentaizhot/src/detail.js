@@ -33,8 +33,10 @@ function execute(url) {
                 name = epData.title || "";
                 description = (epData.description || "").replace(/<[^>]*>?/gm, '').trim();
 
-                if (epData.posterImage && epData.posterImage.filePath) {
-                    cover = IMAGE_URL + epData.posterImage.filePath;
+                // Image logic: posterImage > backdropImage > thumbnailImage
+                var imgObj = epData.posterImage || epData.backdropImage || epData.thumbnailImage;
+                if (imgObj && imgObj.filePath) {
+                    cover = IMAGE_URL + imgObj.filePath;
                 }
 
                 if (epData.studios && epData.studios.length > 0) {

@@ -34,7 +34,7 @@ function execute(url) {
             })
         })
         return Response.success({
-            name: doc.select("h1").text(),
+            name: doc.select('h1').text().split('–')[0].trim(),
             cover: "https://i.imgur.com/5BdXa90.png",
             author:  author.text(),
             description: 'Nghiêm cấm trẻ em dưới 18 tuổi',

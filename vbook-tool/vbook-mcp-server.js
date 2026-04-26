@@ -32,6 +32,12 @@ const GITHUB_REPO = process.env.GITHUB_REPO || 'dat-bi/ext-vbook';
 
 const wizard = require('./lib/wizard');
 
+// ─── Smart Enforcement Layer ──────────────────────────────────────────────────
+const sessionState    = require('./lib/session-state');
+const gate            = require('./lib/gate');
+const detector        = require('./lib/violation-detector');
+const responseWrapper = require('./lib/response-wrapper');
+
 // ─── MCP stdio protocol helpers ───────────────────────────────────────────────
 
 process.stdin.setEncoding('utf8');
@@ -70,7 +76,7 @@ function sendError(id, code, message) {
 const TOOLS = [
     {
         name: 'check_env',
-        description: 'Check environment config (VBOOK_IP, VBOOK_PORT) and device connectivity. Run this FIRST before any other tool.',
+        description: '🚨 MANDATORY FIRST STEP. Check environment config (VBOOK_IP, VBOOK_PORT) and device connectivity. ALWAYS run this before any debug/test/publish operation. If it fails, STOP and notify user.',
         inputSchema: {
             type: 'object',
             properties: {},
@@ -128,7 +134,7 @@ const TOOLS = [
     },
     {
         name: 'create_extension_flow',
-        description: 'Orchestrated wizard to create a new extension. Handles environment checks and data gathering.',
+        description: '🚨 MANDATORY FIRST STEP for creating ANY new extension. Handles: (1) env check, (2) collect required URLs from user, (3) scaffold from _demo_* template. AI MUST call this before writing any script. If status=need_answers, AI MUST ask the user for the listed info and call again with answers object. Never skip this flow.',
         inputSchema: {
             type: 'object',
             properties: {
@@ -137,7 +143,7 @@ const TOOLS = [
                     type: 'object',
                     properties: {
                         name: { type: 'string' },
-                        type: { type: 'string', enum: ['Novel', 'Comic', 'Chinese novel', 'Translate', 'TTS'] },
+                        type: { type: 'string', enum: ['novel', 'comic', 'video', 'chinese_novel', 'translate', 'tts'] },
                         tag: { type: 'string', enum: ['Normal', '18+'] },
                         url_listing: { type: 'string' },
                         url_detail: { type: 'string' },
@@ -202,12 +208,12 @@ const TOOLS = [
     },
     {
         name: 'publish',
-        description: 'Build extension + update root plugin.json registry. This is the final step after testing passes. Automatically bumps version, builds plugin.zip, and updates the extension list.',
+        description: 'Build extension + update root plugin.json registry. AUTOMATICALLY runs pre-publish checklist before building: verifies all scripts exist, type-specific files (track.js for video), and config.js pattern. Set skip_validate=true only if you are sure all checks pass. Final step after test_all passes.',
         inputSchema: {
             type: 'object',
             properties: {
                 extension_path: { type: 'string', description: 'Path to extension directory.' },
-                skip_validate: { type: 'boolean', description: 'Skip validation step' }
+                skip_validate: { type: 'boolean', description: 'Skip pre-publish checklist and validation' }
             },
         }
     },
@@ -258,7 +264,7 @@ const TOOLS = [
     },
     {
         name: 'write_extension_script',
-        description: 'Write or overwrite a script file in an extension\'s src/ directory. Used to implement or fix scripts.',
+        description: '⚠️ PREREQUISITE: For new extensions, create_extension_flow MUST be called first to scaffold from _demo_* template. Never write scripts from scratch. Always implement real selectors found via inspect/analyze — never use placeholder selectors like SELECTOR_TITLE.',
         inputSchema: {
             type: 'object',
             properties: {
@@ -356,12 +362,12 @@ const TOOLS = [
     },
     {
         name: 'copy_demo',
-        description: 'Copy a demo extension template to create a new extension. Options: _demo_novel (novel type) or _demo_comic (comic type).',
+        description: 'Copy a demo extension template (_demo_novel, _demo_comic, _demo_video) to scaffold a new extension. Always use this to create new extensions — never write scripts from scratch. Automatically sets up all required files for the given type.',
         inputSchema: {
             type: 'object',
             properties: {
                 name: { type: 'string', description: 'New extension directory name (e.g. truyenfull)' },
-                type: { type: 'string', enum: ['novel', 'comic'], description: 'Template type: novel or comic' }
+                type: { type: 'string', enum: ['novel', 'comic', 'video'], description: 'Template type: novel, comic, or video' }
             },
             required: ['name', 'type']
         }
@@ -376,6 +382,22 @@ const TOOLS = [
                 extension_dir: { type: 'string', description: 'Context extension directory (e.g. extensions/ntruyen)' }
             },
             required: ['url', 'extension_dir']
+        }
+    },
+    {
+        name: 'get_session_state',
+        description: 'Xem session đang ở bước nào, đã inspect URL nào, extension đang làm. GỌI ĐẦU MỖI SESSION.',
+        inputSchema: { type: 'object', properties: {}, required: [] }
+    },
+    {
+        name: 'reset_session',
+        description: 'Reset state khi bắt đầu làm extension mới hoàn toàn.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                extension_name: { type: 'string', description: 'Tên extension sắp làm' }
+            },
+            required: []
         }
     }
 ];
@@ -511,65 +533,86 @@ async function executeTool(name, args) {
             }
 
             // 2. Check Answers
-            const mandatoryFields = ['name', 'type', 'tag', 'url_listing', 'url_detail', 'url_toc', 'url_chap', 'has_search', 'has_genre'];
-            const missingFields = [];
+            const mandatoryFields = ['name', 'type', 'tag', 'url_listing', 'url_detail', 'url_chap'];
             const answers = args.answers || {};
-            
-            mandatoryFields.forEach(f => {
-                if (answers[f] === undefined) missingFields.push(f);
-            });
+            const missingFields = mandatoryFields.filter(f => answers[f] === undefined || answers[f] === '');
 
             if (missingFields.length > 0) {
-                // If we don't even have a name, try to slugify the siteUrl
-                const name = answers.name || siteUrl.replace(/https?:\/\//, '').replace(/\./g, '-');
-                
-                // Scaffold minimal demo if we have a name and environment is OK
-                if (!fs.existsSync(path.join(PROJECT_ROOT, 'extensions', name))) {
-                    await runCLI(['create', name, '--source', siteUrl, '--minimal'], PROJECT_ROOT);
-                }
-
+                // Do NOT scaffold yet — we need type to pick the right demo template
                 return {
                     status: "need_answers",
                     missing_fields: missingFields,
                     questions: [
                         "Để tạo extension, vui lòng cung cấp các thông tin sau:",
                         "",
-                        "1. Loại truyện? (Novel / Comic / Chinese novel / Translate / TTS)",
-                        "2. Tag? (Normal / 18+)",
-                        "3. Link trang DANH SÁCH truyện (Trang chủ hoặc trang danh sách thể loại):",
-                        "4. Link trang CHI TIẾT một truyện (Bất kỳ truyện nào):",
-                        "5. Link trang MỤC LỤC chương (Nếu khác trang chi tiết):",
-                        "6. Link trang ĐỌC một CHƯƠNG cụ thể:",
-                        "7. Có tìm kiếm (Search) không? [Có / Không]",
-                        "8. Có danh mục thể loại (Genres) không? [Có / Không]"
+                        "1. Tên extension (không dấu, không khoảng trắng, vd: truyenfull):",
+                        "2. Loại nội dung? (novel / comic / video)",
+                        "3. Tag? (Normal / 18+)",
+                        "4. Link trang DANH SÁCH (trang chủ hoặc danh sách thể loại):",
+                        "5. Link trang CHI TIẾT một bộ (bất kỳ):",
+                        "6. Link trang MỤC LỤC (nếu khác trang chi tiết, để trống nếu giống):",
+                        "7. Link trang ĐỌC một chương/tập cụ thể:",
+                        "8. Có tìm kiếm (Search) không? [true/false]",
+                        "9. Có danh mục thể loại (Genres) không? [true/false]"
                     ].join('\n')
                 };
             }
 
-            // 3. All answers present -> Final Creation
-            const createResult = await executeTool('create_smart', {
-                name: answers.name,
-                source: siteUrl,
-                type: answers.type.toLowerCase().replace(' ', '_'),
-                tag: answers.tag,
-                url_home: answers.url_listing,
-                url_detail: answers.url_detail,
-                url_toc: answers.url_toc,
-                url_chap: answers.url_chap,
-                has_search: answers.has_search,
-                has_genre: answers.has_genre
-            });
+            // 3. All answers present → scaffold from _demo_* template
+            const extName = answers.name;
+            const extDir = path.join(PROJECT_ROOT, 'extensions', extName);
 
-            if (createResult.success) {
-                wizard.clearState(siteUrl);
-                return {
-                    status: "success",
-                    message: `Extension '${answers.name}' created successfully!`,
-                    extension_path: createResult.extension_path
-                };
-            } else {
-                return { status: "error", message: createResult.error };
+            if (fs.existsSync(extDir)) {
+                return { status: "error", message: `Extension '${extName}' đã tồn tại. Xóa hoặc dùng tên khác.` };
             }
+
+            // Copy correct demo template
+            const typeMap = { novel: 'novel', comic: 'comic', video: 'video', chinese_novel: 'novel', translate: 'novel', tts: 'novel' };
+            const demoType = typeMap[answers.type] || 'novel';
+            const copyResult = await executeTool('copy_demo', { name: extName, type: demoType });
+            if (!copyResult.success) {
+                return { status: "error", message: `Không thể tạo từ template: ${copyResult.error}` };
+            }
+
+            // 4. Update plugin.json with real metadata
+            const pluginPath = path.join(extDir, 'plugin.json');
+            const plugin = JSON.parse(fs.readFileSync(pluginPath, 'utf8'));
+            plugin.metadata.name = extName;
+            plugin.metadata.source = siteUrl;
+            plugin.metadata.description = `${extName} extension for VBook`;
+            plugin.metadata.type = demoType;
+            plugin.metadata.tag = answers.tag === '18+' ? '18+' : undefined;
+
+            // Build regexp from source URL domain
+            const domain = siteUrl.replace(/https?:\/\//, '').replace(/\//g, '').replace(/\./g, '\\\\.');
+            plugin.metadata.regexp = `https?:\\\\/\\\\/(?:www\\\\.)?${domain}\\\\/`;
+
+            // Add optional scripts
+            if (answers.has_search && !plugin.metadata.script.search) plugin.metadata.script.search = 'search.js';
+            if (answers.has_genre && !plugin.metadata.script.genre) plugin.metadata.script.genre = 'genre.js';
+            // Remove genre script if not needed
+            if (!answers.has_genre && plugin.metadata.script.genre) delete plugin.metadata.script.genre;
+            if (!answers.has_search && plugin.metadata.script.search) delete plugin.metadata.script.search;
+
+            fs.writeFileSync(pluginPath, JSON.stringify(plugin, null, 2), 'utf8');
+
+            // 5. Update config.js with real BASE_URL
+            const configPath = path.join(extDir, 'src', 'config.js');
+            const configContent = `let BASE_URL = "${siteUrl}";\ntry { if (CONFIG_URL) BASE_URL = CONFIG_URL; } catch (e) {}\n`;
+            fs.writeFileSync(configPath, configContent, 'utf8');
+
+            return {
+                status: "success",
+                message: `✅ Extension '${extName}' (${demoType}) đã được tạo từ _demo_${demoType} template!`,
+                extension_path: extDir,
+                next_steps: [
+                    `1. Inspect URL listing:  mcp_vbook_inspect("${answers.url_listing || siteUrl}")`,
+                    `2. Inspect URL detail:   mcp_vbook_inspect("${answers.url_detail}")`,
+                    `3. Inspect URL chapter:  mcp_vbook_inspect("${answers.url_chap}")`,
+                    "4. Implement scripts dựa trên kết quả inspect",
+                    "5. validate → debug → test_all → publish"
+                ]
+            };
         }
 
         case 'validate': {
@@ -631,12 +674,72 @@ async function executeTool(name, args) {
 
         case 'publish': {
             const cwd = resolveExtPath(args.extension_path);
+
+            // ── Pre-publish checklist ─────────────────────────────────────
+            if (!args.skip_validate) {
+                const pluginJsonPath = path.join(cwd, 'plugin.json');
+                const checkErrors = [];
+
+                if (fs.existsSync(pluginJsonPath)) {
+                    const plugin = JSON.parse(fs.readFileSync(pluginJsonPath, 'utf8'));
+                    const type = (plugin.metadata && plugin.metadata.type) || '';
+                    const scripts = (plugin.metadata && plugin.metadata.script) || {};
+                    const srcDir = path.join(cwd, 'src');
+
+                    // 1. All scripts in plugin.json must have corresponding files
+                    Object.keys(scripts).forEach(function(key) {
+                        const file = scripts[key];
+                        if (!fs.existsSync(path.join(srcDir, file))) {
+                            checkErrors.push(`Missing file: src/${file} (declared as "${key}" in plugin.json)`);
+                        }
+                    });
+
+                    // 2. Type-specific required files
+                    if (type === 'video') {
+                        if (!scripts.track) checkErrors.push('Video extension thiếu "track" trong plugin.json script');
+                        if (!scripts.chap) checkErrors.push('Video extension thiếu "chap" trong plugin.json script');
+                        if (scripts.track && !fs.existsSync(path.join(srcDir, 'track.js'))) {
+                            checkErrors.push('Missing file: src/track.js (required for video type)');
+                        }
+                    }
+
+                    // 3. config.js must use let + CONFIG_URL
+                    const configPath = path.join(srcDir, 'config.js');
+                    if (fs.existsSync(configPath)) {
+                        const configContent = fs.readFileSync(configPath, 'utf8');
+                        if (!configContent.includes('CONFIG_URL')) {
+                            checkErrors.push('config.js thiếu CONFIG_URL override pattern: try { if (CONFIG_URL) BASE_URL = CONFIG_URL; } catch(e) {}');
+                        }
+                        if (configContent.includes('const BASE_URL')) {
+                            checkErrors.push('config.js phải dùng "let BASE_URL" không phải "const BASE_URL"');
+                        }
+                    } else {
+                        checkErrors.push('Thiếu src/config.js — bắt buộc phải có');
+                    }
+
+                    // 4. page.js must exist
+                    if (!fs.existsSync(path.join(srcDir, 'page.js'))) {
+                        checkErrors.push('Thiếu src/page.js — bắt buộc phải có (trả về [url] nếu không có phân trang)');
+                    }
+                }
+
+                if (checkErrors.length > 0) {
+                    return {
+                        success: false,
+                        blocked: true,
+                        reason: '❌ Pre-publish checklist FAILED — fix errors trước khi publish',
+                        errors: checkErrors,
+                        tip: 'Dùng skip_validate: true để bỏ qua (không khuyến khích)'
+                    };
+                }
+            }
+            // ─────────────────────────────────────────────────────────────
+
             const cliArgs = ['publish'];
             if (args.skip_validate) cliArgs.push('--skip-validate');
             const out = await runCLI(cliArgs, cwd);
             const success = !out.exitCode && (out.stdout.includes('Published') || out.stdout.includes('✅'));
 
-            // Parse new version from output
             const versionMatch = out.stdout.match(/Version bumped to (\d+)/);
             const countMatch = out.stdout.match(/(\d+) extensions in registry/);
 
@@ -859,7 +962,7 @@ ${selectorCode}
         }
 
         case 'read_context': {
-            const ctxFile = path.join(PROJECT_ROOT, 'context', args.file);
+            const ctxFile = path.join(__dirname, 'context', args.file);
             if (!fs.existsSync(ctxFile)) {
                 return { error: `Context file not found: ${args.file}` };
             }
@@ -868,7 +971,7 @@ ${selectorCode}
         }
 
         case 'append_lesson': {
-            const lessonFile = path.join(PROJECT_ROOT, 'context', '03_lessons.md');
+            const lessonFile = path.join(__dirname, 'context', '03_lessons.md');
             const existing = fs.readFileSync(lessonFile, 'utf8');
             const newContent = existing + '\n\n---\n\n' + args.lesson;
             fs.writeFileSync(lessonFile, newContent, 'utf8');
@@ -930,7 +1033,8 @@ ${selectorCode}
         }
 
         case 'copy_demo': {
-            const demoType = args.type === 'comic' ? '_demo_comic' : '_demo_novel';
+            const demoMap = { novel: '_demo_novel', comic: '_demo_comic', video: '_demo_video' };
+            const demoType = demoMap[args.type] || '_demo_novel';
             const demoDir = path.join(PROJECT_ROOT, 'extensions', demoType);
             const newDir = path.join(PROJECT_ROOT, 'extensions', args.name);
             
@@ -968,9 +1072,106 @@ ${selectorCode}
             return { success: true, extension: args.name, type: args.type };
         }
 
+        case 'get_session_state':
+            return sessionState.getStatus();
+
+        case 'reset_session':
+            sessionState.reset(args.extension_name);
+            return {
+                success: true,
+                message: `Session reset. Extension: ${args.extension_name || 'chưa đặt tên'}`,
+                state: sessionState.getStatus()
+            };
+
         default:
             throw new Error(`Unknown tool: ${name}`);
     }
+}
+
+// ─── State update + Safe execution wrapper ───────────────────────────────────
+
+function updateStateAfterTool(name, args, result) {
+    switch(name) {
+        case 'check_env':
+            if (result.ok) {
+                sessionState.setEnvOk(true);
+                sessionState.advanceTo('env_checked');
+            }
+            break;
+        case 'inspect':
+        case 'get_dom_tree':
+            if (result.success !== false) {
+                sessionState.addInspectedUrl(args.url, result.data || {});
+                if (sessionState.hasMinimumInspected()) {
+                    sessionState.advanceTo('inspected');
+                }
+            }
+            break;
+        case 'create_extension_flow':
+            if (result.status === 'success') {
+                var extName = (args.answers && args.answers.name) || null;
+                if (extName) sessionState.setExtensionName(extName);
+            }
+            break;
+        case 'write_extension_script':
+            if (!result.blocked) sessionState.advanceTo('code_written');
+            break;
+        case 'validate':
+            if (result.errors === 0) sessionState.advanceTo('validated');
+            break;
+        case 'debug':
+            if (result.success) {
+                var scriptName = path.basename(args.file || '');
+                sessionState.markDebuggedScript(scriptName);
+                if (sessionState.allScriptsDebugged()) {
+                    sessionState.advanceTo('debugged');
+                }
+            }
+            break;
+        case 'test_all':
+            if (result.success) sessionState.advanceTo('tested');
+            break;
+        case 'publish':
+        case 'publish_my_extensions':
+            if (result.success) sessionState.advanceTo('published');
+            break;
+    }
+}
+
+async function executeToolSafe(name, args) {
+    // 1. Check gate
+    var gateResult = gate.checkGate(name, sessionState.getStatus());
+    if (gateResult.blocked) {
+        sessionState.logViolation('Gate blocked: ' + name + ' (requires ' + gateResult.required_step + ')');
+        return gateResult;
+    }
+
+    // 2. Special pre-check: reject code with violations before writing file
+    if (name === 'write_extension_script') {
+        var content = args.content || '';
+        var check = detector.runAll(content);
+        if (!check.ok) {
+            sessionState.logViolation('write_extension_script rejected: ' + check.summary);
+            return {
+                blocked: true,
+                reason: '🚫 CODE REJECTED — phát hiện vi phạm trước khi ghi file.',
+                rhino_violations: check.rhino_violations,
+                placeholder_violations: check.placeholder_violations,
+                missing_execute: check.missing_execute,
+                total_violations: check.total_violations,
+                fix_required: true
+            };
+        }
+    }
+
+    // 3. Execute original tool
+    var result = await executeTool(name, args);
+
+    // 4. Update state based on result
+    updateStateAfterTool(name, args, result);
+
+    // 5. Wrap response with hints
+    return responseWrapper.wrap(name, result, sessionState.getStatus());
 }
 
 // ─── MCP message router ───────────────────────────────────────────────────────
@@ -1009,7 +1210,7 @@ function handleMessage(msg) {
             return;
         }
 
-        executeTool(toolName, toolArgs)
+        executeToolSafe(toolName, toolArgs)
             .then((result) => {
                 sendResult(id, {
                     content: [{ type: 'text', text: JSON.stringify(result, null, 2) }]

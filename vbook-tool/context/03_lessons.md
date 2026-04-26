@@ -108,3 +108,12 @@ var title = el.select("SELECTOR").text() + "";
 1. **Check IP First**: Call `mcp_vbook_check_env` immediately. If it fails, report "DEVICE UNREACHABLE" and stop.
 2. **Scaffold & Question**: Once environment is verified, call `mcp_vbook_create` (minimal) or `mcp_vbook_copy_demo` to initialize the project, then ask the 8 standardized questions about the website structure.
 3. **No Guessing**: Wait for user answers and real device data from `mcp_vbook_inspect` before writing any implementation code.
+
+
+---
+
+## Prioritize Fetch Over Browser
+
+**Problem:** Using `Engine.newBrowser()` (Web View) is resource-intensive and slow compared to simple HTTP requests. It introduces delays (like waiting for DOM hydration) and increases the risk of connection timeouts.
+
+**Solution:** Always prioritize using `fetch(url)` or `Http.get(url)` for data extraction. Only fall back to `Engine.newBrowser()` if the site relies heavily on client-side rendering (SPA like React/SvelteKit), has strict anti-bot protections (like Cloudflare Turnstile), or uses complex JavaScript logic to assemble the content that cannot be easily replicated via API calls or static parsing.

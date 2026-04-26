@@ -1,111 +1,65 @@
 load("config.js");
 
 function execute(url) {
-    url = url.replace(/^(?:https?:\/\/)?(?:[^@\n]+@)?(?:www\.)?([^:\/\n?]+)/img, BASE_URL);
-    var slug = url.split('/').pop();
+    url = url.replace(/^(?:https?:\/\/)?(?:www\.)?([^\/]+)/, BASE_URL);
+    if (url.slice(-1) === "/") url = url.slice(0, -1);
 
-    // 1. Fetch HTML và bóc tách Hardcode Metadata
-    var res = fetch(url, { headers: { "User-Agent": UserAgent.chrome() } });
-    if (!res.ok) return Response.error("Không thể tải trang");
-    var html = res.text() + "";
-
-    var name = "", cover = "", author = "", description = "", genres = [], episodeId = "";
-
-    // Tìm khối dữ liệu SvelteKit
-    var dataMatch = html.match(/data:\s*(\[[\s\S]*?\]),\s*form:/);
-    if (dataMatch) {
-        try {
-            // SvelteKit data thường là một mảng, node cuối (thường index 2 hoặc 3) chứa episode info
-            var rawData = dataMatch[1];
-            var dataArr = [];
-            eval("dataArr = " + rawData + ";");
-            // Tìm object có chứa episode info
-            var epData = null;
-            for (var i = 0; i < dataArr.length; i++) {
-                if (dataArr[i] && dataArr[i].data && dataArr[i].data.episode) {
-                    epData = dataArr[i].data.episode;
-                    break;
-                }
-            }
-
-            if (epData) {
-                episodeId = epData.id || "";
-                name = epData.title || "";
-                description = (epData.description || "").replace(/<[^>]*>?/gm, '').trim();
-
-                if (epData.posterImage && epData.posterImage.filePath) {
-                    cover = IMAGE_URL + epData.posterImage.filePath;
-                }
-
-                if (epData.studios && epData.studios.length > 0) {
-                    author = epData.studios[0].studio.name || "";
-                }
-
-                if (epData.genres && epData.genres.length > 0) {
-                    epData.genres.forEach(function (g) {
-                        if (g.genre) {
-                            genres.push({
-                                title: g.genre.name,
-                                input: BASE_URL + "/genres/" + g.genre.slug + "/__data.json?page={{page}}&x-sveltekit-invalidated=001",
-                                script: "gen.js"
-                            });
-                        }
-                    });
-                }
-            }
-        } catch (e) {
-            // Nếu parse hỏng thì dùng fallback cũ
+    var b = Engine.newBrowser();
+    try {
+        b.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+        b.launchAsync(url);
+        
+        for (var i = 0; i < 8; i++) {
+            sleep(1000);
+            var ready = b.callJs("document.querySelector('h2.leading-tight') ? 1 : 0", 1000) + "";
+            if (ready === "1") break;
         }
-    }
-
-    var hash = "1edhnia";
-    load("crypto.js");
-    var payload = CryptoJS.enc.Base64.stringify(CryptoJS.enc.Utf8.parse(JSON.stringify([{ "currentSlug": 1 }, slug])));
-    var apiUrl = BASE_URL + "/_app/remote/" + hash + "/getSeriesEpisodes?payload=" + encodeURIComponent(payload);
-    var apiRes = fetch(apiUrl);
-    if (apiRes.ok) {
-        var apiData = JSON.parse(apiRes.text() + "");
-        if (apiData.result || (apiData.data && apiData.data.result)) {
-            var svelteData = apiData.result || apiData.data.result;
-            cacheStorage.setItem("cached_toc_" + slug, svelteData);
-            // Lấy cover từ getSeriesEpisodes nếu page không có cover
-            if (!cover) {
-                var matchCover = svelteData.match(/(\/202[0-9]\/[0-9]{2}\/[a-zA-Z0-9-]+\.(?:jpg|png|webp))/);
-                if (matchCover) {
-                    cover = IMAGE_URL + matchCover[1];
-                }
+        var html = b.callJs("document.documentElement.outerHTML", 1000) + "";
+        
+        var doc = Html.parse(html);
+        
+        var name = (doc.select("h2.leading-tight").first().text() || "") + "";
+        var cover = "";
+        var coverEl = doc.select("video").first();
+        if (coverEl && coverEl.attr("poster")) {
+            cover = coverEl.attr("poster") + "";
+        } else {
+            coverEl = doc.select("img.aspect-video, img[src*='storage']:not([alt='HentaiZ'])").first();
+            if (coverEl) {
+                cover = (coverEl.attr("data-src") || coverEl.attr("src") || "") + "";
             }
         }
+        if (cover.startsWith("//")) cover = "https:" + cover;
+        if (cover && !cover.startsWith("http")) cover = BASE_URL + cover;
+
+        var author = (doc.select("a[href^='/studios/']").first().text() || "") + "";
+        var description = (doc.select("div.mt-4.text-gray-400").first().html() || "") + "";
+        
+        var genres = [];
+        doc.select("a[href^='/genres/']").forEach(function(el) {
+            var gTitle = (el.text() || "").trim();
+            var gHref = (el.attr("href") || "") + "";
+            if (gTitle && gHref) {
+                if (!gHref.startsWith("http")) gHref = BASE_URL + gHref;
+                genres.push({ title: gTitle, input: gHref, script: "gen.js" });
+            }
+        });
+
+        var comments = [
+            { title: "Bình luận", input: url, script: "comment.js" }
+        ];
+
+        return Response.success({
+            name: name.trim(),
+            cover: cover,
+            host: BASE_URL,
+            author: author.trim(),
+            description: description.trim(),
+            ongoing: false,
+            genres: genres.length > 0 ? genres : undefined,
+            comments: comments
+        });
+    } finally {
+        b.close();
     }
-
-    var result = {
-        name: name || slug,
-        cover: cover,
-        host: BASE_URL,
-        author: author,
-        description: description,
-        ongoing: false,
-        format: "series",
-        genres: genres.length > 0 ? genres : undefined,
-        suggests: [{ title: "Đề xuất: " + (name || slug), input: (name || slug), script: "search.js" }]
-    };
-
-    if (hash && episodeId) {
-        load("crypto.js");
-        var suggestPayload = CryptoJS.enc.Base64.stringify(CryptoJS.enc.Utf8.parse(JSON.stringify([
-            { "currentId": 1, "excludeIds": 2 }, episodeId, []
-        ])));
-        result.suggests = [{
-            title: "Đề xuất",
-            input: BASE_URL + "/_app/remote/" + hash + "/getSuggestedEpisodes?payload=" + encodeURIComponent(suggestPayload),
-            script: "suggest.js"
-        }];
-
-        result.comments = [{
-            title: "Bình luận",
-            input: episodeId,
-            script: "comment.js"
-        }];
-    }
-    return Response.success(result);
 }

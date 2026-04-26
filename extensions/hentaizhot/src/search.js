@@ -1,53 +1,50 @@
 load("config.js");
 
-// search.js — Tìm kiếm truyện
-// Contract: execute(key, page) → [{ name*, link*, cover?, description?, host? }], nextPage?
 function execute(key, page) {
     if (!page) page = "1";
+    var searchUrl = BASE_URL + "/browse?q=" + encodeURIComponent(key) + "&page=" + page;
 
-    key = (key || "") + "";
-    var url = BASE_URL + "/browse?q=" + encodeURIComponent(key) + "&page=" + page;
-
-    // Use Browser to get hydrated DOM
     var b = Engine.newBrowser();
-    var doc = null;
     try {
-        b.setUserAgent(UserAgent.chrome());
-        b.launchAsync(url);
-        var i;
-        for (i = 0; i < 10; i++) {
-            sleep(700);
-            doc = b.html(2000);
-            if (doc && doc.select('a[href*="/watch/"]').size() > 0) break;
+        b.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+        b.launchAsync(searchUrl);
+        
+        for (var i = 0; i < 8; i++) {
+            sleep(1000);
+            var ready = b.callJs("document.querySelectorAll('a[href^=\"/watch/\"]').length > 0 ? 1 : 0", 1000) + "";
+            if (ready === "1") break;
         }
-        if (!doc) doc = b.html(2000);
+        var html = b.callJs("document.documentElement.outerHTML", 1000) + "";
+        
+        var doc = Html.parse(html);
+        var data = [];
+        
+        doc.select("a[href^='/watch/']").forEach(function(el) {
+            var link = (el.attr("href") || "") + "";
+            if (link && !link.startsWith("http")) link = BASE_URL + link;
+            var name = (el.select("h3").text() || el.text() || "") + "";
+            var cover = "";
+            var imgEl = el.select("img").first();
+            if (imgEl) {
+                cover = (imgEl.attr("data-src") || imgEl.attr("src") || "") + "";
+                if (cover.startsWith("//")) cover = "https:" + cover;
+                if (cover && !cover.startsWith("http")) cover = BASE_URL + cover;
+            }
+            
+            if (link) {
+                data.push({
+                    name: name.trim(),
+                    link: link,
+                    cover: cover,
+                    description: (el.select("p").first().text() || "") + "",
+                    host: BASE_URL
+                });
+            }
+        });
+        
+        var hasNext = doc.select("button:contains(Tiếp), a:contains(Tiếp), a[rel=next]").size() > 0;
+        return Response.success(data, hasNext ? String(parseInt(page) + 1) : null);
     } finally {
         b.close();
     }
-
-    var data = [];
-    var seen = {};
-    doc.select('a[href*="/watch/"]').forEach(function (a) {
-        var href = (a.attr("href") || "") + "";
-        if (!href || seen[href]) return;
-        seen[href] = true;
-
-        var name = (a.attr("title") || a.text() || "") + "";
-        name = name.replace(/\s+/g, " ").trim();
-
-        var imgEl = a.select("img").first();
-        var cover = imgEl ? ((imgEl.attr("src") || imgEl.attr("data-src") || "") + "") : "";
-        if (cover && cover.indexOf("http") !== 0) {
-            cover = cover.indexOf("/") === 0 ? (BASE_URL + cover) : (BASE_URL + "/" + cover);
-        }
-
-        var link = href.indexOf("http") === 0 ? href : (href.indexOf("/") === 0 ? (BASE_URL + href) : (BASE_URL + "/" + href));
-        if (data.length < 60) {
-            data.push({ name: name || link, link: link, cover: cover, description: "", host: BASE_URL });
-        }
-    });
-
-    var nextPage = null;
-    if (data.length >= 20 && parseInt(page) < 50) nextPage = String(parseInt(page) + 1);
-    return Response.success(data, nextPage);
 }

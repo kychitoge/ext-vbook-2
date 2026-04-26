@@ -8,7 +8,7 @@
 const path = require('path');
 const fs = require('fs');
 const { sendModernRequest } = require('../utils');
-const { getPluginInfo, getProjectRoot } = require('../lib/plugin-info');
+const { getPluginInfo } = require('../lib/plugin-info');
 const c = require('../lib/colors');
 
 // The analysis script — runs inside Rhino/VBook via the Browser API
@@ -124,38 +124,7 @@ function register(program) {
             const json = options.json || false;
 
             try {
-                let info;
-                try {
-                    // Normal case: run inside an extension dir (has plugin.json)
-                    info = getPluginInfo();
-                    // This repo also has a root-level plugin.json registry.
-                    // If we accidentally resolved that file, it's not a runnable extension context.
-                    const looksLikeExtension =
-                        info &&
-                        info.json &&
-                        info.json.metadata &&
-                        (info.json.script || (info.json.metadata && info.json.metadata.script));
-                    if (!looksLikeExtension) {
-                        throw new Error('Resolved plugin.json is not an extension plugin.json');
-                    }
-                } catch (e) {
-                    // Fallback: allow running from project root by using a demo extension
-                    // as context so we always have extensions/<name>/src/ available.
-                    const projectRoot = getProjectRoot();
-                    const demoCandidates = ['_demo_novel', '_demo_comic', '_demo_video'];
-                    let demoRoot = null;
-                    for (const d of demoCandidates) {
-                        const candidate = path.join(projectRoot, 'extensions', d, 'plugin.json');
-                        if (fs.existsSync(candidate)) {
-                            demoRoot = path.dirname(candidate);
-                            break;
-                        }
-                    }
-                    if (!demoRoot) {
-                        throw new Error("No demo extension found for analyze fallback. Ensure extensions/_demo_* exists.");
-                    }
-                    info = getPluginInfo(demoRoot);
-                }
+                const info = getPluginInfo();
                 const ip = options.ip || process.env.VBOOK_IP;
                 const port = parseInt(options.port || process.env.VBOOK_PORT || '8080');
                 const verbose = options.verbose || process.env.VERBOSE === 'true';

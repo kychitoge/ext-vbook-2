@@ -347,7 +347,7 @@ var res2 = fetch(url2, { headers: { Cookie: savedCookie } });
 var b = Engine.newBrowser();
 try {
   b.setUserAgent(UserAgent.android);
-  b.block(["*.png", "*.jpg", "*.gif", "*.woff"]);
+  b.block(["*\\.png", "*\\.jpg", "*\\.gif", "*\\.woff"]);
   b.launch(url, 12000);
   var doc = b.html();
 } finally {

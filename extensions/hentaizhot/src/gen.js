@@ -1,70 +1,162 @@
 load("config.js");
 
+// gen.js — Danh sách truyện từ 1 trang URL
+// Contract: execute(url, page) → [{name*, link*, cover?, description?, host?, tag?}], nextPage?
 function execute(url, page) {
     if (!page) page = "1";
-    var pageUrl = url.replace("{{page}}", page);
 
-    var b = Engine.newBrowser();
-    try {
-        b.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
-        b.launchAsync(pageUrl);
-        
-        for (var i = 0; i < 8; i++) {
-            sleep(1000);
-            var ready = b.callJs("document.querySelectorAll('a[href^=\"/watch/\"]').length > 0 ? 1 : 0", 1000) + "";
-            if (ready === "1") break;
+    // Normalize URL
+    url = (url || "") + "";
+    url = url.replace(/^(?:https?:\/\/)?(?:[^@\n]+@)?(?:www\.)?([^:\/\n?]+)/img, BASE_URL);
+
+    var pageUrl = url.indexOf("{{page}}") > -1 ? url.replace("{{page}}", page) : url;
+    if (pageUrl.indexOf("page=") === -1 && page !== "1") {
+        pageUrl = pageUrl + (pageUrl.indexOf("?") > -1 ? "&" : "?") + "page=" + page;
+    }
+
+    // API mode: SvelteKit __data.json
+    if (pageUrl.indexOf("/__data.json") > -1) {
+        var res = fetch(pageUrl, { headers: { "Accept": "application/json, text/plain, */*" } });
+        if (!res.ok) return Response.error("Cannot load: " + res.status);
+
+        var root = null;
+        try { root = JSON.parse(res.text() + ""); } catch (e) { root = null; }
+        if (!root || !root.nodes) return Response.error("Invalid payload");
+
+        function resolveValue(v, table, memo) {
+            if (v === null || v === undefined) return v;
+            if (typeof v === "number") {
+                if (memo.hasOwnProperty(String(v))) return memo[String(v)];
+                var raw = table[v];
+                memo[String(v)] = raw; // Placeholder for recursion
+                var resolved = resolveValue(raw, table, memo);
+                memo[String(v)] = resolved;
+                return resolved;
+            }
+            if (Array.isArray(v)) {
+                return v.map(function (x) { return resolveValue(x, table, memo); });
+            }
+            if (typeof v === "object") {
+                var outObj = {};
+                for (var k in v) {
+                    if (v.hasOwnProperty(k)) {
+                        outObj[k] = resolveValue(v[k], table, memo);
+                    }
+                }
+                return outObj;
+            }
+            return v;
         }
-        var html = b.callJs("document.documentElement.outerHTML", 1000) + "";
+
+        var payload = null;
+        for (var i = 0; i < root.nodes.length; i++) {
+            var n = root.nodes[i];
+            if (n && n.type === "data" && Array.isArray(n.data)) {
+                payload = resolveValue(n.data[0], n.data, {});
+                if (payload && (payload.episodes || payload.genres || payload.items)) break;
+            }
+        }
+
+        if (!payload) return Response.error("Data structure not found");
+
+        // Items can be in .episodes, .items, or just the payload itself if it's an array
+        var items = payload.episodes || payload.items || (Array.isArray(payload) ? payload : []);
         
-        var doc = Html.parse(html);
-        var data = [];
-        var urlMap = {};
-        var items = doc.select("a[href^='/watch/']");
-        
-        for (var i = 0; i < items.size(); i++) {
-            var el = items.get(i);
-            var link = (el.attr("href") || "") + "";
+        // If it's a genre page, it might be nested differently
+        if (items.length === 0 && payload.genre && payload.genre.episodes) {
+            items = payload.genre.episodes;
+        }
+
+        var dataApi = [];
+        items.forEach(function (item) {
+            if (!item) return;
+            var slug = (item.slug || "") + "";
+            if (!slug) return;
+
+            var name = ((item.title || item.name || slug) + "").trim();
             
-            if (urlMap[link] || !link.startsWith("/watch/")) continue;
-            
-            var name = (el.select("h3").text() || el.text() || "") + "";
+            // Image logic: posterImage (new), thumbnailImage (old), or genre fallback
             var cover = "";
-            var imgEl = el.select("img").first();
-            if (imgEl) {
-                cover = (imgEl.attr("data-src") || imgEl.attr("src") || "") + "";
-                if (cover.startsWith("//")) cover = "https:" + cover;
-                if (cover && !cover.startsWith("http")) cover = BASE_URL + cover;
+            var imgObj = item.posterImage || item.thumbnailImage;
+            if (imgObj && imgObj.filePath) {
+                cover = imgObj.filePath + "";
+            } else if (payload.genre && payload.genre.thumbnailImage && payload.genre.thumbnailImage.filePath) {
+                cover = payload.genre.thumbnailImage.filePath + "";
             }
-            
-            var descEl = el.select("p").first();
-            var desc = descEl ? descEl.text() : "";
-            
-            if (link) {
-                urlMap[link] = true;
-                data.push({
-                    name: name.trim(),
-                    link: link.startsWith("http") ? link : BASE_URL + link,
-                    cover: cover,
-                    description: desc + "",
-                    host: BASE_URL
-                });
+
+            if (cover && cover.indexOf("http") !== 0) {
+                cover = cover.indexOf("/") === 0 ? (IMAGE_URL + cover) : (IMAGE_URL + "/" + cover);
             }
-        }
-        
-        var hasNext = doc.select("button:contains(Tiếp), a:contains(Tiếp), a[rel=next]").size() > 0;
-        if (!hasNext && data.length > 0) {
-             var pagination = doc.select("nav[aria-label*='pagination'], .pagination");
-             if (pagination.size() > 0) {
-                 var lastPageEl = pagination.select("a, button").last();
-                 var lastPageNum = parseInt((lastPageEl.text() || "") + "");
-                 if (!isNaN(lastPageNum) && parseInt(page) < lastPageNum) {
-                     hasNext = true;
-                 }
-             }
+
+            dataApi.push({
+                name: name,
+                link: BASE_URL + "/watch/" + slug,
+                cover: cover,
+                host: BASE_URL
+            });
+        });
+
+        var nextPageApi = null;
+        var totalPages = parseInt(payload.totalPages) || 0;
+        var currentPage = parseInt(page);
+        if (totalPages > currentPage) {
+            nextPageApi = String(currentPage + 1);
+        } else if (dataApi.length >= 20 && currentPage < 100) {
+            // Conservative fallback
+            nextPageApi = String(currentPage + 1);
         }
 
-        return Response.success(data, hasNext ? String(parseInt(page) + 1) : null);
+        return Response.success(dataApi, nextPageApi);
+    }
+
+    // Browser Fallback (Server-side rendering)
+    var b = Engine.newBrowser();
+    var doc = null;
+    try {
+        b.setUserAgent(UserAgent.chrome());
+        b.launchAsync(pageUrl);
+
+        for (var j = 0; j < 10; j++) {
+            sleep(700);
+            doc = b.html(2000);
+            if (doc && doc.select('a[href*="/watch/"]').size() > 0) break;
+        }
     } finally {
         b.close();
     }
+
+    if (!doc) return Response.error("Cannot load page content");
+
+    var data = [];
+    var seen = {};
+
+    doc.select('a[href*="/watch/"]').forEach(function (a) {
+        var href = (a.attr("href") || "") + "";
+        if (!href || seen[href]) return;
+        seen[href] = true;
+
+        var name = (a.attr("title") || a.text() || "").trim();
+        var imgEl = a.select("img").first();
+        var cover = imgEl ? (imgEl.attr("src") || imgEl.attr("data-src") || "") : "";
+        
+        if (cover && cover.indexOf("http") !== 0) {
+            cover = cover.indexOf("/") === 0 ? (IMAGE_URL + cover) : (IMAGE_URL + "/" + cover);
+        }
+
+        var link = href.indexOf("http") === 0 ? href : (href.indexOf("/") === 0 ? (BASE_URL + href) : (BASE_URL + "/" + href));
+
+        data.push({
+            name: name || link,
+            link: link,
+            cover: cover,
+            host: BASE_URL
+        });
+    });
+
+    if (data.length === 0) return Response.error("No items found");
+
+    var nextPage = null;
+    if (data.length >= 20 && parseInt(page) < 100) nextPage = String(parseInt(page) + 1);
+    
+    return Response.success(data, nextPage);
 }

@@ -29,14 +29,11 @@ function execute(url) {
             chapUrl = chapUrl.startsWith("/") ? BASE_URL + chapUrl : BASE_URL + "/" + chapUrl;
         }
 
-        // Phát hiện tập phim VIP/trả phí
-        var isPaid = el.select(".vip, .paid, .lock, .khoa").size() > 0;
 
         chapters.push({
             name: name,
             url:  chapUrl,
-            host: BASE_URL,
-            pay:  isPaid || undefined
+            host: BASE_URL
         });
     });
 

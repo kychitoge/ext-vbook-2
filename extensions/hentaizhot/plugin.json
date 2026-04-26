@@ -1,33 +1,26 @@
 {
   "metadata": {
-    "name": "HentaiZ",
+    "name": "hentaizhot",
     "author": "B",
-    "version": 1,
+    "version": 4,
     "source": "https://hentaiz.hot",
-    "regexp": "https?:\\\\/\\\\/(?:www\\\\.)?hentaiz\\\\.hot\\\\/watch\\\\/[a-zA-Z0-9-]+\\\\/?$",
-    "description": "HentaiZ - Nền tảng xem hentai vietsub online hàng đầu Việt Nam.",
+    "regexp": "hentaiz\\.hot\\/watch\\/[^/]+\\/?$",
+    "description": "HentaiZ video extension",
     "locale": "vi_VN",
     "language": "javascript",
     "type": "video",
-    "tag": "18+",
-    "script": {
-      "chap": "chap.js",
-      "detail": "detail.js",
-      "gen": "gen.js",
-      "home": "home.js",
-      "page": "page.js",
-      "search": "search.js",
-      "toc": "toc.js",
-      "track": "track.js"
-    }
+    "tag": "18+"
   },
   "script": {
+    "home": "home.js",
+    "genre": "genre.js",
     "detail": "detail.js",
     "page": "page.js",
+    "search": "search.js",
+    "suggest": "suggest.js",
     "toc": "toc.js",
     "chap": "chap.js",
-    "search": "search.js",
-    "home": "home.js",
-    "gen": "gen.js"
+    "track": "track.js",
+    "comment": "comment.js"
   }
 }

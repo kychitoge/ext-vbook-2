@@ -1,8 +1,11 @@
+load("config.js");
+
+// page.js — intermediary between detail and toc
+// This site has playlist on the same page (no pagination for TOC).
 function execute(url) {
-    url = url.replace(/^(?:https?:\/\/)?(?:www\.)?([^\/]+)/, BASE_URL);
+    url = (url || "") + "";
+    url = url.replace(/^(?:https?:\/\/)?(?:[^@\n]+@)?(?:www\.)?([^:\/\n?]+)/img, BASE_URL);
     if (url.slice(-1) === "/") url = url.slice(0, -1);
-    
-    // page.js is a mandatory intermediary. 
-    // It must return an array of URLs for toc.js to process.
     return Response.success([url]);
 }
+

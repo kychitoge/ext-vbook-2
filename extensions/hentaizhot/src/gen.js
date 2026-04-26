@@ -61,7 +61,7 @@ function execute(url, page) {
 
         // Items can be in .episodes, .items, or just the payload itself if it's an array
         var items = payload.episodes || payload.items || (Array.isArray(payload) ? payload : []);
-        
+
         // If it's a genre page, it might be nested differently
         if (items.length === 0 && payload.genre && payload.genre.episodes) {
             items = payload.genre.episodes;
@@ -73,8 +73,24 @@ function execute(url, page) {
             var slug = (item.slug || "") + "";
             if (!slug) return;
 
+            // Extract episode count for tags
+            // Method 1: from slug like "xxx-1", "xxx-2"
+            let tags = "";
+            var epCount = 0;
+            var slugMatch = slug.match(/-(\d+)$/);
+            if (slugMatch) {
+                epCount = parseInt(slugMatch[1]) || 0;
+            }
+            // Method 2: from episodeNumber field (may be null after resolve)
+            if (epCount === 0) {
+                epCount = item.episodeNumber || 0;
+            }
+            if (epCount > 0) {
+                tags = "Tập " + epCount;
+            }
+
             var name = ((item.title || item.name || slug) + "").trim();
-            
+
             // Image logic: posterImage (new), thumbnailImage (old), or genre fallback
             var cover = "";
             var imgObj = item.posterImage || item.thumbnailImage;
@@ -92,21 +108,14 @@ function execute(url, page) {
                 name: name,
                 link: BASE_URL + "/watch/" + slug,
                 cover: cover,
-                host: BASE_URL
+                host: BASE_URL,
+                tag: tags
             });
         });
 
-        var nextPageApi = null;
-        var totalPages = parseInt(payload.totalPages) || 0;
-        var currentPage = parseInt(page);
-        if (totalPages > currentPage) {
-            nextPageApi = String(currentPage + 1);
-        } else if (dataApi.length >= 20 && currentPage < 100) {
-            // Conservative fallback
-            nextPageApi = String(currentPage + 1);
-        }
+        var nextPage = String(parseInt(page) + 1);
 
-        return Response.success(dataApi, nextPageApi);
+        return Response.success(dataApi, nextPage);
     }
 
     // Browser Fallback (Server-side rendering)
@@ -138,13 +147,12 @@ function execute(url, page) {
         var name = (a.attr("title") || a.text() || "").trim();
         var imgEl = a.select("img").first();
         var cover = imgEl ? (imgEl.attr("src") || imgEl.attr("data-src") || "") : "";
-        
+
         if (cover && cover.indexOf("http") !== 0) {
             cover = cover.indexOf("/") === 0 ? (IMAGE_URL + cover) : (IMAGE_URL + "/" + cover);
         }
 
         var link = href.indexOf("http") === 0 ? href : (href.indexOf("/") === 0 ? (BASE_URL + href) : (BASE_URL + "/" + href));
-
         data.push({
             name: name || link,
             link: link,
@@ -155,8 +163,6 @@ function execute(url, page) {
 
     if (data.length === 0) return Response.error("No items found");
 
-    var nextPage = null;
-    if (data.length >= 20 && parseInt(page) < 100) nextPage = String(parseInt(page) + 1);
-    
+    var nextPage = String(parseInt(page) + 1);
     return Response.success(data, nextPage);
 }

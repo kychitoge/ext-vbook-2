@@ -10,6 +10,8 @@ function execute() {
             title: "Mới cập nhật",
             input: BASE_URL + "/browse/__data.json?sort=publishedAt_desc&page={{page}}&limit=24&animationType=TWO_D&contentRating=ALL&isTrailer=false&year=ALL&x-sveltekit-invalidated=001",
             script: "gen.js"
-        }
+        },
+        { title: "3D", input: BASE_URL + "/genres/3d/__data.json?page={{page}}&x-sveltekit-invalidated=001", script: "gen.js" }
+
     ]);
 }

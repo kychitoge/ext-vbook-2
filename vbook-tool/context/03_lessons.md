@@ -133,3 +133,21 @@ var title = el.select("SELECTOR").text() + "";
 **Problem:** Cover images in the listing (`gen.js`) and detail (`detail.js`) were often falling back to the genre-wide thumbnail because `posterImage` was null, even though `backdropImage` contained the correct unique image for the episode.
 
 **Solution:** Updated the image selection priority to `item.posterImage || item.backdropImage || item.thumbnailImage`. This ensures that if the preferred `posterImage` is missing, the script attempts to use the `backdropImage` before falling back to the generic genre thumbnail. This pattern should be applied to all SvelteKit-based extensions for this site.
+
+---
+
+## Xử lý SvelteKit API và Tối ưu hóa CDN Discovery (HentaiZ Case Study)
+
+**Problem:** 
+1. Các trang web dùng SvelteKit (như HentaiZ) có API phức tạp, payload sử dụng định dạng `devalue` với các con trỏ index (ví dụ: `page: 3` trỏ tới phần tử thứ 3 trong mảng tham số). Nếu truyền sai index sẽ bị lỗi 400 Bad Request.
+2. Việc dùng Browser API (`Engine.newBrowser()`) để giải mã Cloudflare và bắt link m3u8 thường rất chậm (10-15s) và không ổn định do phụ thuộc vào việc mô phỏng click nút Play.
+
+**Solution:**
+1. **SvelteKit API Mapping:** Khi gọi API SvelteKit, cần phân tích kỹ mảng payload để ánh xạ đúng index cho các tham số như `page`, `sort`.
+   - Ví dụ: `payload = [{"page": 3}, "TYPE", "ID", 1]` -> `page` ở đây giá trị thực là `1`.
+2. **Brute-force CDN Discovery:** Thay vì dùng Browser để bắt link, hãy phân tích quy luật của server CDN (ví dụ: `c1-c10.animez.top`).
+   - Sử dụng vòng lặp quét nhanh các subdomain bằng `fetch` với header `Range: bytes=0-1`.
+   - Nếu `res.status === 200` hoặc `206`, đó là link video thật có thể phát bằng Native Player.
+   - Kết quả: Tốc độ lấy link giảm từ 15s xuống còn ~1.5s.
+3. **Date Parsing:** Với dữ liệu ngày tháng dạng mảng `["Date", "2024-..."]`, dùng `new Date(item[1])` để parse chính xác trong môi trường Rhino.
+4. **Bypass Redirect:** Thay thế trực tiếp domain gateway (ví dụ `e.streamqq.com`) bằng domain server gốc (`p1.spexliu.top`) để né lỗi 302 và các lớp bảo vệ trung gian.

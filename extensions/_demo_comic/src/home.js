@@ -7,6 +7,5 @@ function execute() {
         { title: "Mới cập nhật", input: BASE_URL + "/PATH_MOI/{{page}}",  script: "gen.js" },
         { title: "Top view",     input: BASE_URL + "/PATH_TOP/{{page}}",  script: "gen.js" },
         { title: "Hoàn thành",   input: BASE_URL + "/PATH_HOAN/{{page}}", script: "gen.js" },
-        { title: "Thể loại",     input: BASE_URL + "/PATH_THELOAI",       script: "genre.js" }
     ]);
 }

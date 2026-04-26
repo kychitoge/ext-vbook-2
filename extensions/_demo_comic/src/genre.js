@@ -1,4 +1,15 @@
-// genre.js (Comic)
+// Ưu tiên trả về trực tiếp thế này không phải load nhiều
+// genre.js — Danh sách thể loại
+// Contract: execute() → [{ title, input, script }]
+// Cách 1: Trả về trực tiếp
+function execute() {
+    // TODO: Thay URL path phù hợp với site thực tế
+    return Response.success([
+        { title: "Thể loại 1", input: BASE_URL + "/DUONG_DAN_MOI/{{page}}",    script: "gen.js" },
+        { title: "Thể loại 2", input: BASE_URL + "/DUONG_DAN_HOT/{{page}}",    script: "gen.js" },
+    ]);
+// có thể lấy nhanh bằng cách này console.log([...document.querySelectorAll('body > div.logo2 > div:nth-child(39) a')].map(e => `{title: "${e.innerText}", input: "${e.href.replace(/^(?:\/\/|[^/]+)*/, '')}", script: "gen.js"},`).join('\n'));
+}
 // Contract: execute() → [{ title, input, script }]
 function execute() {
     // TODO: Thay PATH_THELOAI bằng URL trang thể loại thực tế

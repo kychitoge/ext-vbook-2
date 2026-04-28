@@ -20,7 +20,7 @@ function execute(url, page) {
     var seen = {};
 
     // TODO: selector container mỗi cuốn truyện trong danh sách
-    doc.select("SELECTOR_ITEM").forEach(function(el) {
+    doc.select("SELECTOR_ITEM").forEach(function (el) {
 
         // TODO: selector thẻ <a> chứa tên + link truyện (trong container trên)
         var linkEl = el.select("SELECTOR_TITLE_LINK").first();
@@ -39,14 +39,29 @@ function execute(url, page) {
         // Ưu tiên data-src (lazy-load), fallback sang src
         var cover = imgEl ? ((imgEl.attr("data-src") || imgEl.attr("src") || "") + "") : "";
         if (cover.startsWith("//")) cover = "https:" + cover;
+        if (cover && !cover.startsWith("http")) cover = BASE_URL + cover;
 
+        // ✅ Chỉ encode phần path + query (nếu cần)
+        try {
+            var urlObj = new URL(cover);
+            // encode pathname (tránh lỗi space, unicode…)
+            urlObj.pathname = urlObj.pathname
+                .split("/")
+                .map(p => encodeURIComponent(p))
+                .join("/");
+            cover = urlObj.toString();
+        } catch (e) {
+            // fallback nếu URL lỗi format
+            cover = encodeURI(cover);
+        }
+        let tag = el.select(".Demo").text().trim();
         data.push({
-            name:        linkEl.text().trim() + "",
-            link:        link,
-            cover:       cover,
+            name: linkEl.text().trim() + "",
+            link: link,
+            cover: cover,
             description: "",
-            host:        BASE_URL,
-            tag: e.select(".Demo").text()
+            host: BASE_URL,
+            tag: tag
         });
     });
 

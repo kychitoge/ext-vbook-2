@@ -18,9 +18,22 @@ function execute(url) {
     var coverEl = doc.select("SELECTOR_COVER_IMG").first();
     var cover = "";
     if (coverEl) {
-        cover = (coverEl.attr("data-src") || coverEl.attr("data-lazy-src") || coverEl.attr("src") || "") + "";
+        cover = (coverEl.attr("data-src") || coverEl.attr("src") || "") + "";
         if (cover.startsWith("//")) cover = "https:" + cover;
         if (cover && !cover.startsWith("http")) cover = BASE_URL + cover;
+        // ✅ Chỉ encode phần path + query (nếu cần)
+        try {
+            var urlObj = new URL(cover);
+            // encode pathname (tránh lỗi space, unicode…)
+            urlObj.pathname = urlObj.pathname
+                .split("/")
+                .map(p => encodeURIComponent(p))
+                .join("/");
+            cover = urlObj.toString();
+        } catch (e) {
+            // fallback nếu URL lỗi format
+            cover = encodeURI(cover);
+        }
     }
 
     // TODO: Selector tác giả
@@ -32,7 +45,8 @@ function execute(url) {
     var status = (statusEl ? statusEl.text() : "") + "";
     var ongoing = status.indexOf("Hoàn") === -1
         && status.indexOf("Completed") === -1
-        && status.indexOf("Full") === -1;
+        && status.indexOf("Full") === -1
+        && status.indexOf("完结") === -1;
 
     // TODO: Selector container mô tả / tóm tắt
     var descEl = doc.select("SELECTOR_DESCRIPTION").first();
@@ -49,11 +63,14 @@ function execute(url) {
     });
 
     var suggests = [];
-    if (author) {
-        suggests.push({ title: "Cùng tác giả: " + author, input: author, script: "search.js" });
-    }
-    //Bình luận — chỉ thêm nếu site có comment (Q9=Có)
-    // var comments = [{ title: "Bình luận", input: API_URL + "?page={{page}}", script: "comment.js" }];
+    // Cách đơn giản: tìm theo tác giả nếu có search.js
+    suggests.push({ title: "Liên quan: ", input: author, script: "suggests.js" });
+
+    // TODO: Bình luận — chỉ thêm nếu site có  comment (Q9=Có)
+    let comments = [];
+    let inputcomment = ""; // có thể là lấy ngay từ SELECTOR nào đó trên trang, hoặc API riêng nếu có
+    comments.push({ title: "Bình luận", input: inputcomment, script: "comment.js" });
+
     return Response.success({
         name: name,
         cover: cover,
@@ -61,8 +78,10 @@ function execute(url) {
         author: author,
         description: description,
         ongoing: ongoing,
-        genres: genres.length > 0 ? genres : undefined,
-        suggests: suggests.length > 0 ? suggests : undefined
-        // comments: comments  // bỏ comment dòng này nếu có comment.js
+        format: "series", // Định dạng "series" dành cho web có nhiều tập, nếu phim lẻ có thể bỏ hoặc để khác
+        genres: genres,
+        suggests: suggests,
+        comments: comments
     });
 }
+

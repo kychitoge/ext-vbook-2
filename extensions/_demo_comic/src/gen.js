@@ -17,13 +17,13 @@ function execute(url, page) {
     var seen = {};
 
     // TODO: [1] Selector container mỗi bộ manga/comic trong danh sách
-    doc.select("SELECTOR_ITEM").forEach(function(el) {
+    doc.select("SELECTOR_ITEM").forEach(function (el) {
 
         // TODO: [2] Selector thẻ <a> tên + link — trong container trên
         var linkEl = el.select("SELECTOR_TITLE_LINK").first();
 
         // TODO: [3] Selector thẻ <img> ảnh bìa — ưu tiên data-src (lazy-load)
-        var imgEl  = el.select("img").first();
+        var imgEl = el.select("img").first();
 
         if (!linkEl) return;
         var link = (linkEl.attr("href") || "") + "";
@@ -31,16 +31,31 @@ function execute(url, page) {
         seen[link] = true;
 
         if (!link.startsWith("http")) link = BASE_URL + link;
-        var cover = imgEl ? ((imgEl.attr("data-src") || imgEl.attr("data-lazy-src") || imgEl.attr("src") || "") + "") : "";
+        var cover = imgEl ? ((imgEl.attr("data-src") || imgEl.attr("src") || "") + "") : "";
         if (cover.startsWith("//")) cover = "https:" + cover;
+        if (cover && !cover.startsWith("http")) cover = BASE_URL + cover;
+
+        // ✅ Chỉ encode phần path + query (nếu cần)
+        try {
+            var urlObj = new URL(cover);
+            // encode pathname (tránh lỗi space, unicode…)
+            urlObj.pathname = urlObj.pathname
+                .split("/")
+                .map(p => encodeURIComponent(p))
+                .join("/");
+            cover = urlObj.toString();
+        } catch (e) {
+            // fallback nếu URL lỗi format
+            cover = encodeURI(cover);
+        }
 
         data.push({
-            name:        linkEl.text().trim() + "",
-            link:        link,
-            cover:       cover,
+            name: linkEl.text().trim() + "",
+            link: link,
+            cover: cover,
             description: "",
-            host:        BASE_URL,
-            tag: e.select(".Demo").text(),
+            host: BASE_URL,
+            tag: el.select(".Demo").text().trim(),
         });
     });
 

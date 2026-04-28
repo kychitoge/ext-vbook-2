@@ -246,17 +246,6 @@
             "tag": "nsfw"
         },
         {
-            "name": "NguonC",
-            "author": "Moleys",
-            "path": "https://raw.githubusercontent.com/dat-bi/ext-vbook/main/extensions/nguoc/plugin.zip",
-            "version": 1,
-            "source": "https://phim.nguonc.com",
-            "icon": "https://raw.githubusercontent.com/dat-bi/ext-vbook/main/extensions/nguoc/icon.png",
-            "description": "Xem phim trên NguonC",
-            "type": "video",
-            "locale": "vi_VN"
-        },
-        {
             "name": "nhatruyen",
             "author": "B",
             "path": "https://raw.githubusercontent.com/dat-bi/ext-vbook/main/extensions/nhatruyen/plugin.zip",

@@ -12,7 +12,6 @@ function execute(url) {
     if (!apiResponse.ok) return null;
     let json = JSON.parse(apiResponse.text());
     let totalPages = json.totalPages || 1;
-    // console.log(totalPagess);
     let data = [];
     for (let i = 1; i <= totalPages; i++) {
         data.push(apiBase + i);

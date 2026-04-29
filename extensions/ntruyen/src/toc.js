@@ -36,6 +36,14 @@ function buildApiUrl(url, baseUrl) {
 }
 
 function extractStoryId(html) {
-    let match = html.match(/"data":\{"id":(\d+),/);
-    return match ? match[1] : null;
+    var normalized = html.replace(/\\"/g, '"');
+    var patterns = [
+        /"data"\s*:\s*\{"id"\s*:\s*(\d+)/,
+        /"novelId"\s*:\s*(\d+)/
+    ];
+    for (var i = 0; i < patterns.length; i++) {
+        var match = normalized.match(patterns[i]);
+        if (match) return match[1];
+    }
+    return null;
 }
